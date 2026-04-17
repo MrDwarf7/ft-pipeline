@@ -13,7 +13,9 @@ import {
 } from "./classify-db.ts";
 import {
   type ClassifyResult,
+  type ClassificationResult,
   classifyWithLLM,
+  CONFIDENCE_THRESHOLD,
 } from "./classify-llm.ts";
 
 interface ClassifyOptions {
@@ -26,7 +28,12 @@ const chunk = <T>(arr: T[], size: number): T[][] =>
     arr.slice(i * size, i * size + size),
   );
 
-const classifyRow = async (db: Database, llm: ConnectedLLM, row: Row): Promise<ClassifyResult> => {
+const classifyRow = async (
+  db: Database,
+  llm: ConnectedLLM,
+  row: Row,
+  allResults: Array<{ tweet_id: string } & ClassificationResult>,
+): Promise<ClassifyResult> => {
   const content = row.clippings_text || row.article_text || row.text;
 
   if (!content || content.trim().length < 10) {
@@ -38,8 +45,9 @@ const classifyRow = async (db: Database, llm: ConnectedLLM, row: Row): Promise<C
     return "classified";
   }
 
-  const result = await classifyWithLLM(llm, content, row.author_handle);
+  const result = await classifyWithLLM(llm, content, row.author_handle, row.tweet_id);
   saveClassification(db, row.tweet_id, result);
+  allResults.push({ tweet_id: row.tweet_id, ...result });
   logger.info("classified bookmark", {
     tweet_id: row.tweet_id,
     category: result.primary_type,
@@ -47,13 +55,26 @@ const classifyRow = async (db: Database, llm: ConnectedLLM, row: Row): Promise<C
     confidence: result.confidence,
   });
 
+  if (result.confidence < CONFIDENCE_THRESHOLD) {
+    logger.warn("low confidence classification", {
+      tweet_id: row.tweet_id,
+      primary_type: result.primary_type,
+      confidence: result.confidence,
+    });
+  }
+
   // Rate limit between individual LLM calls
   await new Promise((r) => setTimeout(r, 200));
   return "classified";
 };
 
-const processRow = (db: Database, llm: ConnectedLLM, row: Row): Promise<ClassifyResult> =>
-  classifyRow(db, llm, row).catch((err) => {
+const processRow = (
+  db: Database,
+  llm: ConnectedLLM,
+  row: Row,
+  allResults: Array<{ tweet_id: string } & ClassificationResult>,
+): Promise<ClassifyResult> =>
+  classifyRow(db, llm, row, allResults).catch((err) => {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error("classify failed", { tweet_id: row.tweet_id, error: msg });
     return "failed" as const;
@@ -65,13 +86,14 @@ const processBatch = (
   batchNum: number,
   totalBatches: number,
   rows: Row[],
+  allResults: Array<{ tweet_id: string } & ClassificationResult>,
 ): Promise<ClassifyResult[]> => {
   logger.info("processing classification batch", {
     batch: batchNum,
     total: totalBatches,
     size: rows.length,
   });
-  return Promise.all(rows.map((row) => processRow(db, llm, row)));
+  return Promise.all(rows.map((row) => processRow(db, llm, row, allResults)));
 };
 
 const summarize = (results: ClassifyResult[]) => {
@@ -100,13 +122,27 @@ export const runClassify = async (llm: ConnectedLLM, options: ClassifyOptions): 
     }
     if (options.dryRun) return dryRunPreview(rows);
 
+    const allResults: Array<{ tweet_id: string } & ClassificationResult> = [];
     const batches = chunk(rows, CONFIG.classificationBatchSize);
     const batchResults = await Promise.all(
-      batches.map((batch, i) => processBatch(db, llm, i + 1, batches.length, batch)),
+      batches.map((batch, i) => processBatch(db, llm, i + 1, batches.length, batch, allResults)),
     );
 
     const { classified, failed } = summarize(batchResults.flat());
     logger.info("classify complete", { classified, failed, total: rows.length });
+
+    // Write classification results backup
+    const resultsOutput = {
+      run_at: new Date().toISOString(),
+      model: llm.modelName() ?? "unknown",
+      total_classified: classified,
+      failed,
+      confidence_threshold: CONFIDENCE_THRESHOLD,
+      results: allResults,
+    };
+    const resultsPath = `${Deno.env.get("HOME")}/.ft-bookmarks/classification-results.json`;
+    await Deno.writeTextFile(resultsPath, JSON.stringify(resultsOutput, null, 2));
+    logger.info("wrote classification results backup", { path: resultsPath, count: allResults.length });
   } finally {
     db.close();
   }
