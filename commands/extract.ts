@@ -29,7 +29,7 @@ interface XtracticleResponse {
     likes?: number;
     bookmarks?: number;
     views?: number;
-    media?: XtracticleMedia[] | null;
+    media?: XtracticleMedia[] | { all?: XtracticleMedia[]; photos?: XtracticleMedia[]; mosaic?: Record<string, unknown> } | null;
     article?: Record<string, unknown> | null;
   }>;
 }
@@ -44,6 +44,17 @@ interface Row {
 }
 
 type ExtractResult = "extracted" | "skipped" | "failed";
+
+/** Normalize xtracticle media (could be array or {all, photos, mosaic} object) */
+const normalizeMedia = (
+  media: XtracticleResponse["tweets"][0]["media"],
+): XtracticleMedia[] => {
+  if (!media) return [];
+  if (Array.isArray(media)) return media;
+  if (Array.isArray(media.all)) return media.all;
+  if (Array.isArray(media.photos)) return media.photos;
+  return [];
+};
 
 /** Build rev-iso filename: YYYY_MM_DD-Dow-@handle-slug-title.md */
 const buildFilename = (tweet: XtracticleResponse["tweets"][0]): string => {
@@ -168,7 +179,8 @@ const findExistingClipping = async (
 const classifyTweet = (
   tweet: XtracticleResponse["tweets"][0],
 ): { dir: string; type: string } => {
-  const hasMedia = Array.isArray(tweet.media) && tweet.media.length > 0;
+  const mediaArray = normalizeMedia(tweet.media);
+  const hasMedia = mediaArray.length > 0;
   const articleContent = (tweet.article as Record<string, unknown>)?.content as
     | Record<string, unknown>
     | undefined;
@@ -193,7 +205,7 @@ const buildFrontmatter = (
   tweet: XtracticleResponse["tweets"][0],
   type: string,
 ): string => {
-  const directTypes = [...new Set((tweet.media || []).map((m) => m.type))];
+  const directTypes = [...new Set(normalizeMedia(tweet.media).map((m) => m.type))];
   const articleImages = extractArticleImages(tweet);
 
   // Include "photo" in media_types if article has images
@@ -233,10 +245,10 @@ const buildMediaList = (
   articleImages: string[],
 ): string => {
   const lines: string[] = [];
+  const mediaArray = normalizeMedia(media);
 
   // Direct tweet media (photos, videos, GIFs)
-  if (Array.isArray(media)) {
-    for (const m of media) {
+  for (const m of mediaArray) {
       if (m.type === "photo") {
         lines.push(`![image](${m.url})`);
       } else if (m.type === "video") {
@@ -252,7 +264,6 @@ const buildMediaList = (
         lines.push(`${thumb}[▶ View GIF](${m.url})`);
       }
     }
-  }
 
   // Article images (cover + inline) — dedup against already-added media
   for (const url of articleImages) {
