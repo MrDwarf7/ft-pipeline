@@ -1,5 +1,4 @@
 // commands/classify-llm.ts -- LLM prompt, call, and response parsing for classification
-// B3: system prompt, temperature 0.1, content cap 2000, confidence scale
 
 import { DOMAINS, TYPES } from "../config.ts";
 import { type ConnectedLLM } from "../llm/index.ts";
@@ -78,14 +77,15 @@ export const parseLLMResponse = (text: string): ClassificationResult => {
 
   const result = JSON.parse(jsonMatch[0]);
 
+  const types = Array.isArray(result.types) ? result.types : [result.primary_type];
+  const domains = Array.isArray(result.domains) ? result.domains : [result.primary_domain];
+
   return {
-    ...result,
-    primary_type: TYPES.includes(result.primary_type)
-      ? result.primary_type
-      : "opinion",
-    primary_domain: DOMAINS.includes(result.primary_domain)
-      ? result.primary_domain
-      : "culture",
+    types: types.map((t: string) => TYPES.includes(t) ? t : null).filter(Boolean),
+    primary_type: TYPES.includes(result.primary_type) ? result.primary_type : "opinion",
+    domains: domains.map((d: string) => DOMAINS.includes(d) ? d : null).filter(Boolean),
+    primary_domain: DOMAINS.includes(result.primary_domain) ? result.primary_domain : "culture",
+    confidence: typeof result.confidence === "number" ? Math.min(1, Math.max(0, result.confidence)) : 0.5,
   };
 };
 

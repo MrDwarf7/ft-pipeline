@@ -1,5 +1,4 @@
 // commands/classify-db.ts -- DB operations for classification
-// B2: change these to write to our_* columns
 
 import { Database } from "https://deno.land/x/sqlite3@0.12.0/mod.ts";
 import { logger } from "../utils/logger.ts";
@@ -18,7 +17,7 @@ export const queryUnclassified = (db: Database, limit?: number): Row[] =>
     .prepare(`
     SELECT tweet_id, text, author_handle, article_text, clippings_text
     FROM bookmarks
-    WHERE primary_category = 'unclassified' OR primary_category IS NULL
+    WHERE our_primary_type IS NULL
     ORDER BY posted_at DESC
     ${limit ? `LIMIT ${limit}` : ""}
   `)
@@ -35,29 +34,50 @@ export const dryRunPreview = (rows: Row[]) => {
     );
 };
 
-export const markShortTweet = (db: Database, tweetId: string) =>
-  db
-    .prepare(
-      "UPDATE bookmarks SET primary_category = ?, primary_domain = ?, classification_confidence = 0.1 WHERE tweet_id = ?",
-    )
-    .run("meme-shitpost", "culture", tweetId);
+export const markShortTweet = (db: Database, tweetId: string) => {
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE bookmarks SET
+      our_type = ?,
+      our_primary_type = ?,
+      our_domains = ?,
+      our_primary_domain = ?,
+      our_classified_at = ?,
+      our_confidence = ?
+    WHERE tweet_id = ?
+  `).run(
+    '["meme-shitpost"]',
+    "meme-shitpost",
+    '["culture"]',
+    "culture",
+    now,
+    0.1,
+    tweetId,
+  );
+};
 
 export const saveClassification = (
   db: Database,
   tweetId: string,
   result: ClassificationResult,
-) =>
-  db
-    .prepare(`
+) => {
+  const now = new Date().toISOString();
+  db.prepare(`
     UPDATE bookmarks SET
-      primary_category = ?,
-      primary_domain = ?,
-      classification_confidence = ?
+      our_type = ?,
+      our_primary_type = ?,
+      our_domains = ?,
+      our_primary_domain = ?,
+      our_classified_at = ?,
+      our_confidence = ?
     WHERE tweet_id = ?
-  `)
-    .run(
-      result.primary_type,
-      result.primary_domain,
-      result.confidence,
-      tweetId,
-    );
+  `).run(
+    JSON.stringify(result.types),
+    result.primary_type,
+    JSON.stringify(result.domains),
+    result.primary_domain,
+    now,
+    result.confidence,
+    tweetId,
+  );
+};
