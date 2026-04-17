@@ -7,11 +7,12 @@ import { logger } from "../utils/logger.ts";
 interface BookmarkEntry {
   tweet_id: string;
   text: string;
+  display_text: string;
   author_handle: string;
   author_name: string;
   posted_at: string;
-  primary_category: string;
-  primary_domain: string;
+  our_primary_type: string;
+  our_primary_domain: string;
   likes: number;
 }
 
@@ -22,10 +23,11 @@ export const runIndexes = async (): Promise<void> => {
   try {
     const bookmarks = db.prepare(`
       SELECT tweet_id, text, author_handle, author_name, posted_at,
-             primary_category, primary_domain, 
-             COALESCE(like_count, 0) as likes
+             our_primary_type, our_primary_domain,
+             COALESCE(like_count, 0) as likes,
+             COALESCE(clippings_text, text) as display_text
       FROM bookmarks
-      WHERE primary_category IS NOT NULL AND primary_category != 'unclassified'
+      WHERE our_primary_type IS NOT NULL
       ORDER BY posted_at DESC
     `).all<BookmarkEntry>();
 
@@ -34,7 +36,7 @@ export const runIndexes = async (): Promise<void> => {
     // Group by category/domain using reduce
     const byCategory = bookmarks.reduce(
       (acc, b) => {
-        const cat = b.primary_category || "unclassified";
+        const cat = b.our_primary_type || "unclassified";
         return { ...acc, [cat]: [...(acc[cat] || []), b] };
       },
       {} as Record<string, BookmarkEntry[]>,
@@ -42,7 +44,7 @@ export const runIndexes = async (): Promise<void> => {
 
     const byDomain = bookmarks.reduce(
       (acc, b) => {
-        const dom = b.primary_domain || "uncategorized";
+        const dom = b.our_primary_domain || "uncategorized";
         return { ...acc, [dom]: [...(acc[dom] || []), b] };
       },
       {} as Record<string, BookmarkEntry[]>,
@@ -78,6 +80,12 @@ ${topByLikes.map((e) => formatBookmarkLine(e, "category")).join("\n\n")}
 ## Recent
 
 ${entries.slice(0, 20).map((e) => formatBookmarkLine(e, "category")).join("\n\n")}
+
+## Related Domains
+${[...new Set(entries.map((e) => e.our_primary_domain))].map((d) => `- [[domains/${d}]]`).join("\n")}
+
+## Top Authors
+${[...new Set(entries.map((e) => e.author_handle))].slice(0, 20).map((h) => `- [[entities/${h}]]`).join("\n")}
 `;
 
       await Deno.writeTextFile(`${categoriesDir}/${category}.md`, content);
@@ -116,6 +124,12 @@ ${topByLikes.map((e) => formatBookmarkLine(e, "domain")).join("\n\n")}
 ## Recent
 
 ${entries.slice(0, 20).map((e) => formatBookmarkLine(e, "domain")).join("\n\n")}
+
+## Related Categories
+${[...new Set(entries.map((e) => e.our_primary_type))].map((c) => `- [[categories/${c}]]`).join("\n")}
+
+## Top Authors
+${[...new Set(entries.map((e) => e.author_handle))].slice(0, 20).map((h) => `- [[entities/${h}]]`).join("\n")}
 `;
 
       await Deno.writeTextFile(`${domainsDir}/${domain}.md`, content);
@@ -124,7 +138,67 @@ ${entries.slice(0, 20).map((e) => formatBookmarkLine(e, "domain")).join("\n\n")}
 
     await Promise.all(Object.entries(byDomain).map(writeDomainPage));
 
+    // Generate entity pages (authors with 5+ bookmarks)
+    const entityDir = `${CONFIG.mdOutputDir}/entities`;
+    await Deno.mkdir(entityDir, { recursive: true });
+
+    const ENTITY_THRESHOLD = 5;
+
+    const byAuthor = bookmarks.reduce(
+      (acc, b) => {
+        return { ...acc, [b.author_handle]: [...(acc[b.author_handle] || []), b] };
+      },
+      {} as Record<string, BookmarkEntry[]>,
+    );
+
+    const writeEntityPage = async ([handle, entries]: [string, BookmarkEntry[]]) => {
+      if (entries.length < ENTITY_THRESHOLD) return;
+
+      const topByLikes = entries.toSorted((a, b) => b.likes - a.likes).slice(0, 50);
+      const authorName = entries[0]?.author_name || handle;
+
+      const categories = [...new Set(entries.map((e) => e.our_primary_type))];
+      const domains = [...new Set(entries.map((e) => e.our_primary_domain))];
+
+      const content = `---
+type: entity
+author: @${handle}
+author_name: "${authorName}"
+count: ${entries.length}
+updated: ${new Date().toISOString()}
+---
+
+# @${handle} — ${authorName}
+
+${entries.length} bookmarks from this author.
+
+## Top by Engagement
+
+${topByLikes.map((e) => formatBookmarkLine(e, "domain")).join("\n\n")}
+
+## Recent
+
+${entries.slice(0, 20).map((e) => formatBookmarkLine(e, "domain")).join("\n\n")}
+
+## Categories
+${categories.map((c) => `- [[categories/${c}]]`).join("\n")}
+
+## Domains
+${domains.map((d) => `- [[domains/${d}]]`).join("\n")}
+`;
+
+      await Deno.writeTextFile(`${entityDir}/${handle}.md`, content);
+      logger.info("entity page written", { handle, count: entries.length });
+    };
+
+    await Promise.all(Object.entries(byAuthor).map(writeEntityPage));
+
     // Generate master index
+    const topEntities = Object.entries(byAuthor)
+      .filter(([_, entries]) => entries.length >= ENTITY_THRESHOLD)
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 50);
+
     const masterContent = `---
 type: index
 updated: ${new Date().toISOString()}
@@ -141,6 +215,12 @@ ${TYPES.map((t) => `- [[categories/${t}|${t}]] (${byCategory[t]?.length || 0})`)
 ## By Domain
 
 ${DOMAINS.map((d) => `- [[domains/${d}|${d}]] (${byDomain[d]?.length || 0})`).join("\n")}
+
+## Top Entities
+
+${topEntities.map(([handle, entries]) =>
+  `- [[entities/${handle}|@${handle}]] (${entries.length})`
+).join("\n")}
 `;
 
     await Deno.writeTextFile(`${CONFIG.mdOutputDir}/index.md`, masterContent);
@@ -156,12 +236,14 @@ type LinkType = "category" | "domain";
 
 const formatBookmarkLine = (b: BookmarkEntry, linkType: LinkType): string => {
   const date = b.posted_at ? new Date(b.posted_at).toISOString().split("T")[0] : "unknown";
-  const linkTarget = linkType === "category" ? b.primary_category : b.primary_domain;
-  const textPreview = b.text.length > 120 ? b.text.slice(0, 120) + "..." : b.text;
+  const linkTarget = linkType === "category" ? b.our_primary_type : b.our_primary_domain;
+  const textPreview = b.display_text.length > 120
+    ? b.display_text.slice(0, 120) + "..."
+    : b.display_text;
   const escapedText = textPreview.replace(/\n/g, " ");
 
   return `- **@${b.author_handle}** (${date}) -- ${escapedText}
-  [${linkTarget}] | [Original](https://x.com/i/status/${b.tweet_id})${
+  [[${linkType}s/${linkTarget}]] | [[entities/${b.author_handle}]] | [Original](https://x.com/i/status/${b.tweet_id})${
     b.likes > 100 ? ` | ❤️ ${b.likes}` : ""
   }`;
 };
