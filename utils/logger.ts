@@ -1,11 +1,5 @@
 // utils/logger.ts -- @std/log with rotating file handler
-import {
-  ConsoleHandler,
-  getLogger,
-  type LogRecord,
-  RotatingFileHandler,
-  setup,
-} from "@std/log";
+import { ConsoleHandler, getLogger, type LogRecord, RotatingFileHandler, setup } from "@std/log";
 
 const LOG_DIR = `${Deno.env.get("HOME")}/.ft-bookmarks/logs`;
 await Deno.mkdir(LOG_DIR, { recursive: true });
@@ -14,9 +8,7 @@ const LOG_PATH = `${LOG_DIR}/pipeline.log`;
 
 const fmt = (r: LogRecord, timestamp = false): string => {
   const prefix = timestamp ? `${r.datetime.toISOString()} [${r.levelName}] ` : "";
-  const ctx = r.args?.[0] && typeof r.args[0] === "object"
-    ? ` ${JSON.stringify(r.args[0])}`
-    : "";
+  const ctx = r.args?.[0] && typeof r.args[0] === "object" ? ` ${JSON.stringify(r.args[0])}` : "";
   return `${prefix}${r.msg}${ctx}`;
 };
 

@@ -3,6 +3,7 @@
 import { parseArgs } from "@std/cli/parse-args";
 
 export const Command = {
+  Migrate: "migrate",
   Cookies: "cookies",
   Sync: "sync",
   Extract: "extract",

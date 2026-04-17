@@ -24,18 +24,30 @@ export const runCookieExtract = async (): Promise<void> => {
   logger.info("go to x.com, open DevTools -> Application -> Cookies, copy ct0 value");
 
   const ct0 = prompt("ct0 value:");
-  if (!ct0) return logger.error("aborted");
+  if (!ct0) {
+    logger.error("aborted");
+    return;
+  }
 
   logger.info("copy the auth_token cookie value");
   const authToken = prompt("auth_token value:");
-  if (!authToken) return logger.error("aborted");
+  if (!authToken) {
+    logger.error("aborted");
+    return;
+  }
 
   logger.info("set an encryption password for the cookie file");
   const password = prompt("Password:");
-  if (!password) return logger.error("aborted");
+  if (!password) {
+    logger.error("aborted");
+    return;
+  }
 
   const confirm = prompt("Confirm password:");
-  if (password !== confirm) return logger.error("passwords don't match");
+  if (password !== confirm) {
+    logger.error("passwords don't match");
+    return;
+  }
 
   const data: CookieData = {
     ct0,
@@ -61,7 +73,7 @@ const SALT_LEN = 16;
 const IV_LEN = 12;
 const ITERATIONS = 100_000;
 
-const deriveKey = async (password: string, salt: Uint8Array): Promise<CryptoKey> => {
+const deriveKey = async (password: string, salt: BufferSource): Promise<CryptoKey> => {
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
@@ -80,8 +92,8 @@ const deriveKey = async (password: string, salt: Uint8Array): Promise<CryptoKey>
 };
 
 const encrypt = async (plaintext: string, password: string): Promise<string> => {
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
-  const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
+  const salt = new Uint8Array(crypto.getRandomValues(new Uint8Array(SALT_LEN)));
+  const iv = new Uint8Array(crypto.getRandomValues(new Uint8Array(IV_LEN)));
   const key = await deriveKey(password, salt);
   const enc = new TextEncoder();
 

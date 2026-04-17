@@ -1,12 +1,12 @@
 # B2 — Classify writes to ft's old columns instead of our_ prefix
-**Priority:** P1 — Critical
-**Status:** Overwrites ft's existing data, loses multi-label info
+
+**Priority:** P1 — Critical **Status:** Overwrites ft's existing data, loses multi-label info
 
 ## Problem
 
-classify.ts writes results to `primary_category`, `primary_domain`, and
-`classification_confidence`. These are the FT CLI's original columns. The
-agreed plan uses `our_*` prefixed columns to avoid collisions:
+classify.ts writes results to `primary_category`, `primary_domain`, and `classification_confidence`.
+These are the FT CLI's original columns. The agreed plan uses `our_*` prefixed columns to avoid
+collisions:
 
 - `our_type TEXT` — JSON array of types (e.g. `["technique","tool"]`)
 - `our_primary_type TEXT` — single best-fit (e.g. `"technique"`)
@@ -16,6 +16,7 @@ agreed plan uses `our_*` prefixed columns to avoid collisions:
 - `our_confidence REAL` — 0.0-1.0
 
 Currently classify.ts:
+
 1. Overwrites ft's existing `primary_category` data (206 bookmarks already classified by ft)
 2. Doesn't store multi-label arrays (plan says each bookmark can have multiple types/domains)
 3. Doesn't record when classification happened
@@ -112,19 +113,18 @@ Ensure it matches what parseLLMResponse returns and what saveClassification expe
 
 ```typescript
 interface ClassificationResult {
-  types: string[];          // JSON array stored as-is
-  primary_type: string;     // single string
-  domains: string[];        // JSON array stored as-is
-  primary_domain: string;   // single string
-  confidence: number;       // 0.0-1.0
+  types: string[]; // JSON array stored as-is
+  primary_type: string; // single string
+  domains: string[]; // JSON array stored as-is
+  primary_domain: string; // single string
+  confidence: number; // 0.0-1.0
 }
 ```
 
 ### 6. Update `parseLLMResponse`
 
-Validate that returned types/domains match our taxonomy. Currently falls back
-to "opinion" / "culture" for invalid values. Keep that but also validate
-the array elements:
+Validate that returned types/domains match our taxonomy. Currently falls back to "opinion" /
+"culture" for invalid values. Keep that but also validate the array elements:
 
 ```typescript
 const parseLLMResponse = (text: string): ClassificationResult => {
@@ -142,7 +142,9 @@ const parseLLMResponse = (text: string): ClassificationResult => {
     primary_type: TYPES.includes(result.primary_type) ? result.primary_type : "opinion",
     domains: domains.map((d: string) => DOMAINS.includes(d) ? d : null).filter(Boolean),
     primary_domain: DOMAINS.includes(result.primary_domain) ? result.primary_domain : "culture",
-    confidence: typeof result.confidence === "number" ? Math.min(1, Math.max(0, result.confidence)) : 0.5,
+    confidence: typeof result.confidence === "number"
+      ? Math.min(1, Math.max(0, result.confidence))
+      : 0.5,
   };
 };
 ```

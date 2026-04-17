@@ -15,7 +15,8 @@ export type ClassifyResult = "classified" | "failed";
 
 export const CONFIDENCE_THRESHOLD = 0.7;
 
-const SYSTEM_PROMPT = `You classify X/Twitter bookmarks. Each bookmark is a tweet — some are tech tools, some are conspiracy threads, some are just memes. Your job is to figure out what KIND of thing it is (type) and what it's ABOUT (domain).
+const SYSTEM_PROMPT =
+  `You classify X/Twitter bookmarks. Each bookmark is a tweet — some are tech tools, some are conspiracy threads, some are just memes. Your job is to figure out what KIND of thing it is (type) and what it's ABOUT (domain).
 
 TYPES (what kind of content):
 - tool: GitHub repos, CLI tools, npm packages, open-source projects, dev tools
@@ -81,11 +82,17 @@ export const parseLLMResponse = (text: string): ClassificationResult => {
   const domains = Array.isArray(result.domains) ? result.domains : [result.primary_domain];
 
   return {
-    types: types.map((t: string) => TYPES.includes(t) ? t : null).filter(Boolean),
+    types: types.filter((t: string): t is typeof TYPES[number] =>
+      (TYPES as readonly string[]).includes(t)
+    ),
     primary_type: TYPES.includes(result.primary_type) ? result.primary_type : "opinion",
-    domains: domains.map((d: string) => DOMAINS.includes(d) ? d : null).filter(Boolean),
+    domains: domains.filter((d: string): d is typeof DOMAINS[number] =>
+      (DOMAINS as readonly string[]).includes(d)
+    ),
     primary_domain: DOMAINS.includes(result.primary_domain) ? result.primary_domain : "culture",
-    confidence: typeof result.confidence === "number" ? Math.min(1, Math.max(0, result.confidence)) : 0.5,
+    confidence: typeof result.confidence === "number"
+      ? Math.min(1, Math.max(0, result.confidence))
+      : 0.5,
   };
 };
 

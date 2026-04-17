@@ -8,7 +8,7 @@
 import { Database } from "https://deno.land/x/sqlite3@0.12.0/mod.ts";
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
-import { parseFrontmatter, extractBody } from "../utils/frontmatter.ts";
+import { extractBody, parseFrontmatter } from "../utils/frontmatter.ts";
 
 interface MergeOptions {
   dryRun?: boolean;
@@ -65,26 +65,6 @@ const readClippings = async (): Promise<Map<string, ClippingEntry>> => {
   return clippings;
 };
 
-/** Ensure the merge columns exist in the DB */
-const ensureColumns = (db: Database): void => {
-  // Check existing columns
-  const columns = db.prepare("PRAGMA table_info(bookmarks)").all<{ name: string }>();
-  const colNames = new Set(columns.map((c) => c.name));
-
-  const needed = [
-    { name: "clippings_text", type: "TEXT" },
-    { name: "clippings_type", type: "TEXT" },
-    { name: "clippings_merged_at", type: "TEXT" },
-  ];
-
-  for (const col of needed) {
-    if (!colNames.has(col.name)) {
-      db.exec(`ALTER TABLE bookmarks ADD COLUMN ${col.name} ${col.type}`);
-      logger.info("added column", { column: col.name });
-    }
-  }
-};
-
 export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
   logger.info("merge started");
 
@@ -106,14 +86,14 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
     return;
   }
 
-  const db = new Database(CONFIG.dbPath);
+  const db = new Database(CONFIG.pipelineDbPath);
   db.exec("PRAGMA journal_mode=WAL");
   try {
-    ensureColumns(db);
-
     // Find which tweet_ids exist in the DB
     const dbIds = new Set(
-      db.prepare("SELECT tweet_id FROM bookmarks").all<{ tweet_id: string }>().map((r) => r.tweet_id),
+      db.prepare("SELECT tweet_id FROM bookmarks").all<{ tweet_id: string }>().map((r) =>
+        r.tweet_id
+      ),
     );
 
     let merged = 0;

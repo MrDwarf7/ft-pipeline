@@ -2,9 +2,9 @@
 
 ## READ THIS FIRST
 
-If you're an AI agent entering this repo, read this file top-to-bottom before
-touching anything. Then read `TODO.md` for the full audit of what's broken,
-and check `_fixes/` for detailed fix specs on each issue.
+If you're an AI agent entering this repo, read this file top-to-bottom before touching anything.
+Then read `TODO.md` for the full audit of what's broken, and check `_fixes/` for detailed fix specs
+on each issue.
 
 **MANDATORY WORKFLOW:** After every code change, run `deno task ch:all` and ensure all checks pass
 before handing back to the user. Fix any new errors immediately — do not leave the user with
@@ -12,11 +12,11 @@ regressions.
 
 ## What This Is
 
-A Deno/TypeScript CLI for processing X/Twitter bookmarks from the `ft` CLI.
-Full pipeline: Sync → Extract → Merge → Classify → Generate → Indexes.
+A Deno/TypeScript CLI for processing X/Twitter bookmarks from the `ft` CLI. Full pipeline: Sync →
+Extract → Merge → Classify → Generate → Indexes.
 
-2204 bookmarks in a local SQLite DB. Goal: classify them by type/domain using
-a local LLM, generate Obsidian wiki pages.
+2204 bookmarks in a local SQLite DB. Goal: classify them by type/domain using a local LLM, generate
+Obsidian wiki pages.
 
 ## Project Structure
 
@@ -71,30 +71,29 @@ deno task full        # Run entire pipeline end-to-end
 
 ## Current Pipeline Status
 
-What the code actually does vs. what was agreed. See `TODO.md` for the full
-audit and `_fixes/` for step-by-step fix instructions.
+What the code actually does vs. what was agreed. See `TODO.md` for the full audit and `_fixes/` for
+step-by-step fix instructions.
 
 ```
 Agreed:   SYNC → EXTRACT → MERGE → CLASSIFY → GENERATE → INDEXES
 Actual:   SYNC → EXTRACT → (nothing) → CLASSIFY → ft md → index pages
 ```
 
-| Step | Status | What's wrong | Fix doc |
-|------|--------|-------------|---------|
-| Sync | ✅ | Works | — |
-| Extract | ✅ | Patched (query + classifyTweet). Article images still missing. | B4 |
-| Merge | ❌ | **Missing entirely.** Not in Command enum, no task, no code. | B1 |
-| Classify | ⚠️ | Writes ft's old columns, no system prompt, no enrichment. | B2, B3 |
-| Generate | ⚠️ | Just re-runs `ft md --force`, doesn't create planned pages. | — |
-| Indexes | ⚠️ | Reads ft's old columns, no entity pages, no cross-links. | B5 |
+| Step     | Status | What's wrong                                                   | Fix doc |
+| -------- | ------ | -------------------------------------------------------------- | ------- |
+| Sync     | ✅     | Works                                                          | —       |
+| Extract  | ✅     | Patched (query + classifyTweet). Article images still missing. | B4      |
+| Merge    | ❌     | **Missing entirely.** Not in Command enum, no task, no code.   | B1      |
+| Classify | ⚠️     | Writes ft's old columns, no system prompt, no enrichment.      | B2, B3  |
+| Generate | ⚠️     | Just re-runs `ft md --force`, doesn't create planned pages.    | —       |
+| Indexes  | ⚠️     | Reads ft's old columns, no entity pages, no cross-links.       | B5      |
 
-**Fix dependency chain:** B1 → B2 → B3 → B5 (merge feeds classify, classify
-writes our_* columns, indexes reads our_*). B4 is independent.
+**Fix dependency chain:** B1 → B2 → B3 → B5 (merge feeds classify, classify writes our*\* columns,
+indexes reads our*\*). B4 is independent.
 
 ## Agreed Pipeline Flow
 
-The full spec lives in `_archive/classification-plan.md` (586 lines). Here's
-the executive summary:
+The full spec lives in `_archive/classification-plan.md` (586 lines). Here's the executive summary:
 
 ```
 1. SYNC: ft CLI GraphQL → bookmarks.db
@@ -115,8 +114,8 @@ the executive summary:
 4. CLASSIFY: DB → Local LLM → DB
    - Uses clippings_text when available (falls back to text)
    - Sends to local Gemma via llama-server
-   - Writes: our_type, our_primary_type, our_domains, our_primary_domain, our_confidence
-   - Does NOT overwrite ft's existing primary_category column
+   - Writes: primary_type, primary_domain, types, domains, confidence
+   - Uses our own pipeline.db — ft's DB untouched
 
 5. GENERATE: DB → md pages in ~/.ft-bookmarks/md/
    - Bookmark stubs, domain pages, category pages, entity pages, master index
@@ -124,9 +123,19 @@ the executive summary:
 6. INDEXES: DB → index pages with cross-links and entity summaries
 ```
 
+## Architecture
+
+**Two databases:**
+
+- `~/.ft-bookmarks/bookmarks.db` — ft's DB, READ-ONLY. We never touch it.
+- `~/.ft-bookmarks/pipeline.db` — ours. Full schema we control, migrations on demand.
+
+Sync copies bookmarks from ft's DB into ours. Everything else reads/writes pipeline.db.
+
 ## Key Paths
 
-- **DB:** `~/.ft-bookmarks/bookmarks.db`
+- **ft DB (read-only):** `~/.ft-bookmarks/bookmarks.db`
+- **Pipeline DB (ours):** `~/.ft-bookmarks/pipeline.db`
 - **Clippings:** `/mnt/data_drive/Obsidian/StoneVault/Clippings/`
 - **LLM:** `http://localhost:1234/v1/chat/completions` (Gemma 4 E4B)
 - **Config:** `config.ts` — all paths, thresholds, taxonomy
@@ -136,6 +145,7 @@ the executive summary:
 ## Content Classification Rules (extract)
 
 classifyTweet checks what xtracticle returns for the tweet:
+
 1. **Media only** (short/no text, no article) → X-Media
 2. **Article blocks from xtracticle OR long text (≥200 chars)** → X-Articles
 3. **Short text, no article, no media** → X-Posts
@@ -144,13 +154,16 @@ Article+media goes to X-Articles (media doesn't override content type).
 
 ## Taxonomy (classify)
 
-**Types:** tool, technique, launch, research, opinion, security, news, meme-shitpost, tutorial, resource
+**Types:** tool, technique, launch, research, opinion, security, news, meme-shitpost, tutorial,
+resource
 
-**Domains:** agentic, ai-ml, security, devops, programming, geopolitics, conspiracy, health, finance, crypto, media, culture, science
+**Domains:** agentic, ai-ml, security, devops, programming, geopolitics, conspiracy, health,
+finance, crypto, media, culture, science
 
 Each bookmark gets ONE primary_type and ONE primary_domain. Multi-label allowed in arrays.
 
 Critical rules:
+
 - `crypto` is CONTAINED — do NOT bleed into finance
 - `geopolitics` ≠ `conspiracy` — elections/wars vs UFOs/cover-ups
 - `agentic` generalizes Claude Code, OpenClaw, Hermes, etc.
@@ -158,18 +171,34 @@ Critical rules:
 
 ## DB Schema
 
-Key columns (bookmarks table):
-- `tweet_id`, `url`, `text`, `author_handle`, `author_name`
-- `links_json`, `media_count`, `link_count`
-- `clipping_path` — set by extract (path to Clippings/*.md)
-- `content_type` — set by extract ('article' | 'post' | 'media')
-- `clippings_text` — set by merge (enriched text from Clippings) [NOT YET IMPLEMENTED]
-- `our_type`, `our_primary_type`, `our_domains`, `our_primary_domain` — set by classify [NOT YET IMPLEMENTED]
-- `primary_category`, `primary_domain` — OLD ft columns, DO NOT overwrite
+## DB Schema (pipeline.db)
 
-Columns that need to be added (see B1, B2):
-- `clippings_text TEXT`, `clippings_type TEXT`, `clippings_merged_at TEXT`
-- `our_type TEXT`, `our_primary_type TEXT`, `our_domains TEXT`, `our_primary_domain TEXT`, `our_classified_at TEXT`, `our_confidence REAL`
+```sql
+CREATE TABLE bookmarks (
+  tweet_id          TEXT PRIMARY KEY,
+  url               TEXT,
+  text              TEXT,
+  author_handle     TEXT,
+  author_name       TEXT,
+  posted_at         TEXT,
+  links_json        TEXT,
+  media_count       INTEGER DEFAULT 0,
+  clipping_path     TEXT,
+  content_type      TEXT,           -- 'article' | 'post' | 'media'
+  clippings_text    TEXT,
+  clippings_type    TEXT,
+  clippings_merged_at TEXT,
+  primary_type      TEXT,
+  primary_domain    TEXT,
+  types             TEXT,           -- JSON array
+  domains           TEXT,           -- JSON array
+  confidence        REAL,
+  classified_at     TEXT,
+  synced_at         TEXT
+);
+```
+
+This is OUR database. `migrate.ts` creates it. We never touch ft's bookmarks.db.
 
 ## xtracticle Response Structure
 
@@ -191,6 +220,7 @@ Columns that need to be added (see B1, B2):
 ```
 
 Key gotchas:
+
 - `tweet.text` is often empty for X Articles (content lives in article.content.blocks)
 - `tweet.media.all` = direct tweet media, separate from article media
 - Article images live in article.cover_media + article.media_entities

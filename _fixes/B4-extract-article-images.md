@@ -1,18 +1,20 @@
 # B4 — Extract doesn't capture article images
-**Priority:** P2 — Important
-**Status:** Article tweets lose embedded media
+
+**Priority:** P2 — Important **Status:** Article tweets lose embedded media
 
 ## Problem
 
 When xtracticle returns an X Article, the article content has embedded images in:
+
 - `tweet.article.cover_media.media_info.original_img_url` — cover image
 - `tweet.article.media_entities[].media_info.original_img_url` — inline images
 
-The extract command only processes `tweet.media.all` (direct tweet media like
-photos/videos attached to the tweet itself). Article images are completely
-ignored — they don't get saved to the clipping .md file.
+The extract command only processes `tweet.media.all` (direct tweet media like photos/videos attached
+to the tweet itself). Article images are completely ignored — they don't get saved to the clipping
+.md file.
 
 Example: tweet 2042243910022406521 has:
+
 - `tweet.media.all`: [] (empty — no direct media)
 - `article.cover_media`: https://pbs.twimg.com/media/HFd9nS_WUAAu-Tl.jpg
 - `article.media_entities`: https://pbs.twimg.com/media/HFd--C_XsAA1bJK.jpg
@@ -99,8 +101,8 @@ const buildClippingContent = (
   type: string,
 ): string => {
   const text = getEffectiveText(tweet);
-  const articleImages = extractArticleImages(tweet);  // ← NEW
-  const mediaList = buildMediaList(tweet.media, articleImages);  // ← UPDATED
+  const articleImages = extractArticleImages(tweet); // ← NEW
+  const mediaList = buildMediaList(tweet.media, articleImages); // ← UPDATED
 
   // Extract article title if present
   const articleTitle = tweet.article && typeof tweet.article === "object"

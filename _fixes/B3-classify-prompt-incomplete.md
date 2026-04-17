@@ -1,11 +1,11 @@
 # B3 — Classify prompt and LLM settings incomplete
-**Priority:** P2 — Important
-**Status:** Classification quality suffers without proper prompt
+
+**Priority:** P2 — Important **Status:** Classification quality suffers without proper prompt
 
 ## Problem
 
-The current classify prompt is a flat user message with no system prompt, wrong
-temperature, and truncated content. The agreed plan specifies:
+The current classify prompt is a flat user message with no system prompt, wrong temperature, and
+truncated content. The agreed plan specifies:
 
 1. **System prompt** with full taxonomy definitions, decision helpers, confidence scale
 2. **Temperature 0.1** (currently 0.3) for deterministic classification
@@ -14,15 +14,15 @@ temperature, and truncated content. The agreed plan specifies:
 5. **Confidence threshold** — flag < 0.7 for review, don't just store blindly
 6. **Backup JSON output** — write classification-results.json
 
-The prompt is the quality bottleneck. A bad prompt with a great model still
-produces garbage classifications.
+The prompt is the quality bottleneck. A bad prompt with a great model still produces garbage
+classifications.
 
 ## Steps
 
 ### 1. Add system prompt constant
 
-In classify.ts, add the full system prompt from the plan. This defines the
-taxonomy, decision helpers, and output format:
+In classify.ts, add the full system prompt from the plan. This defines the taxonomy, decision
+helpers, and output format:
 
 ```typescript
 const SYSTEM_PROMPT = `You classify X/Twitter bookmarks. Each bookmark is a tweet — some are tech
@@ -84,11 +84,11 @@ const classifyWithLLM = async (
 ): Promise<ClassificationResult> => {
   const text = await llm.chat({
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },  // ← NEW
+      { role: "system", content: SYSTEM_PROMPT }, // ← NEW
       { role: "user", content: buildPrompt(content, author) },
     ],
-    temperature: 0.1,   // ← was 0.3
-    maxTokens: 500,     // ← bump for multi-label JSON
+    temperature: 0.1, // ← was 0.3
+    maxTokens: 500, // ← bump for multi-label JSON
     jsonSchema: CLASSIFY_SCHEMA,
   });
   return parseLLMResponse(text);
@@ -129,17 +129,19 @@ const classifyRow = async (db: Database, llm: ConnectedLLM, row: Row): Promise<C
 ```
 
 Also update the Row interface in classify.ts:
+
 ```typescript
 interface Row {
   tweet_id: string;
   text: string;
   author_handle: string;
   article_text: string | null;
-  clippings_text: string | null;  // ← ADD
+  clippings_text: string | null; // ← ADD
 }
 ```
 
 And update queryUnclassified SELECT to include clippings_text:
+
 ```sql
 SELECT tweet_id, text, author_handle, article_text, clippings_text
 FROM bookmarks
@@ -175,7 +177,7 @@ const resultsOutput = {
   total_classified: classified,
   failed,
   confidence_threshold: CONFIDENCE_THRESHOLD,
-  results: allResults,  // collect during processing
+  results: allResults, // collect during processing
 };
 
 await Deno.writeTextFile(

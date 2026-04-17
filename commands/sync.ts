@@ -1,5 +1,10 @@
-// commands/sync.ts -- Sync bookmarks from X via ft CLI
+// commands/sync.ts -- Sync bookmarks from X via ft CLI, then import into our DB
+//
+// We run ft CLI sync to update ~/.ft-bookmarks/bookmarks.db (ft's DB),
+// then COPY new/updated bookmarks into our own pipeline.db.
 
+import { Database } from "https://deno.land/x/sqlite3@0.12.0/mod.ts";
+import { CONFIG } from "../config.ts";
 import { checkCookies, getCookies } from "./cookies.ts";
 import { logger } from "../utils/logger.ts";
 
@@ -11,6 +16,80 @@ interface SyncOptions {
   continue?: boolean;
   gaps?: boolean;
 }
+
+/** Copy bookmarks from ft's DB into our pipeline DB */
+const importFromFtDb = (): { imported: number; updated: number } => {
+  const ftDb = new Database(CONFIG.ftDbPath);
+  const pipelineDb = new Database(CONFIG.pipelineDbPath);
+  pipelineDb.exec("PRAGMA journal_mode=WAL");
+
+  try {
+    // Read all bookmarks from ft's DB
+    const ftRows = ftDb.prepare(`
+      SELECT tweet_id, url, text, author_handle, author_name, posted_at,
+             links_json, COALESCE(media_count, 0) as media_count
+      FROM bookmarks
+      ORDER BY posted_at DESC
+    `).all<{
+      tweet_id: string;
+      url: string;
+      text: string;
+      author_handle: string;
+      author_name: string;
+      posted_at: string;
+      links_json: string | null;
+      media_count: number;
+    }>();
+
+    // Upsert into our DB
+    const stmt = pipelineDb.prepare(`
+      INSERT INTO bookmarks (tweet_id, url, text, author_handle, author_name, posted_at, links_json, media_count, synced_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(tweet_id) DO UPDATE SET
+        url = excluded.url,
+        text = excluded.text,
+        author_handle = excluded.author_handle,
+        author_name = excluded.author_name,
+        posted_at = excluded.posted_at,
+        links_json = excluded.links_json,
+        media_count = excluded.media_count,
+        synced_at = excluded.synced_at
+    `);
+
+    const now = new Date().toISOString();
+    let imported = 0;
+
+    pipelineDb.exec("BEGIN");
+    try {
+      for (const row of ftRows) {
+        stmt.run(
+          row.tweet_id,
+          row.url,
+          row.text,
+          row.author_handle,
+          row.author_name,
+          row.posted_at,
+          row.links_json,
+          row.media_count,
+          now,
+        );
+        imported++;
+      }
+      pipelineDb.exec("COMMIT");
+    } catch (err) {
+      pipelineDb.exec("ROLLBACK");
+      throw err;
+    }
+
+    ftDb.close();
+    pipelineDb.close();
+    return { imported, updated: 0 };
+  } catch (err) {
+    ftDb.close();
+    pipelineDb.close();
+    throw err;
+  }
+};
 
 export const runSync = async (
   password: string | undefined,
@@ -59,5 +138,7 @@ export const runSync = async (
     throw new Error(`ft sync failed (exit ${result.code})`);
   }
 
-  logger.info("sync complete — bookmarks updated from X");
+  logger.info("ft CLI sync complete — importing into pipeline DB");
+  const { imported } = importFromFtDb();
+  logger.info("import complete", { imported });
 };

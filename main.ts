@@ -35,6 +35,10 @@ const main = async () => {
         }
         break;
 
+      case Command.Migrate:
+        pipeline.migrate()();
+        break;
+
       case Command.Sync:
         await pipeline.sync(args)();
         break;

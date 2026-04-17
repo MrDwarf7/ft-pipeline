@@ -5,15 +5,15 @@ import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { type ConnectedLLM } from "../llm/index.ts";
 import {
-  type Row,
-  queryUnclassified,
   dryRunPreview,
   markShortTweet,
+  queryUnclassified,
+  type Row,
   saveClassification,
 } from "./classify-db.ts";
 import {
-  type ClassifyResult,
   type ClassificationResult,
+  type ClassifyResult,
   classifyWithLLM,
   CONFIDENCE_THRESHOLD,
 } from "./classify-llm.ts";
@@ -24,8 +24,9 @@ interface ClassifyOptions {
 }
 
 const chunk = <T>(arr: T[], size: number): T[][] =>
-  Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
-    arr.slice(i * size, i * size + size),
+  Array.from(
+    { length: Math.ceil(arr.length / size) },
+    (_, i) => arr.slice(i * size, i * size + size),
   );
 
 const classifyRow = async (
@@ -34,7 +35,7 @@ const classifyRow = async (
   row: Row,
   allResults: Array<{ tweet_id: string } & ClassificationResult>,
 ): Promise<ClassifyResult> => {
-  const content = row.clippings_text || row.article_text || row.text;
+  const content = row.clippings_text || row.text;
 
   if (!content || content.trim().length < 10) {
     markShortTweet(db, row.tweet_id);
@@ -110,7 +111,7 @@ const summarize = (results: ClassifyResult[]) => {
 export const runClassify = async (llm: ConnectedLLM, options: ClassifyOptions): Promise<void> => {
   logger.info("classify started", { model: llm.modelName() ?? "unknown" });
 
-  const db = new Database(CONFIG.dbPath);
+  const db = new Database(CONFIG.pipelineDbPath);
   db.exec("PRAGMA journal_mode=WAL");
   try {
     const rows = queryUnclassified(db, options.limit);
@@ -142,7 +143,10 @@ export const runClassify = async (llm: ConnectedLLM, options: ClassifyOptions): 
     };
     const resultsPath = `${Deno.env.get("HOME")}/.ft-bookmarks/classification-results.json`;
     await Deno.writeTextFile(resultsPath, JSON.stringify(resultsOutput, null, 2));
-    logger.info("wrote classification results backup", { path: resultsPath, count: allResults.length });
+    logger.info("wrote classification results backup", {
+      path: resultsPath,
+      count: allResults.length,
+    });
   } finally {
     db.close();
   }

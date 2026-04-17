@@ -1,20 +1,19 @@
 # B1 — Merge step missing from pipeline
-**Priority:** P1 — Critical
-**Status:** Blocks classification quality
+
+**Priority:** P1 — Critical **Status:** Blocks classification quality
 
 ## Problem
 
-The agreed pipeline has a MERGE step between EXTRACT and CLASSIFY. It should
-read the Clippings .md files, extract enriched text, and write it back to the
-DB as `clippings_text`. This gives the classifier 4883 chars of article content
-instead of 23 chars of "https://t.co/...".
+The agreed pipeline has a MERGE step between EXTRACT and CLASSIFY. It should read the Clippings .md
+files, extract enriched text, and write it back to the DB as `clippings_text`. This gives the
+classifier 4883 chars of article content instead of 23 chars of "https://t.co/...".
 
-Without merge, classify reads `row.article_text || row.text` — the old
-`article_text` column only has 27 rows. The 1769 Clippings files (74 articles +
-1153 posts + 542 media) never make it into the DB.
+Without merge, classify reads `row.article_text || row.text` — the old `article_text` column only
+has 27 rows. The 1769 Clippings files (74 articles + 1153 posts + 542 media) never make it into the
+DB.
 
-A Python version (`merge-clippings.py`) exists in `_archive/` but is not
-integrated into the Deno pipeline at all.
+A Python version (`merge-clippings.py`) exists in `_archive/` but is not integrated into the Deno
+pipeline at all.
 
 ## Steps
 
@@ -103,6 +102,7 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
 ### 2. Add `clippings_text` column to DB
 
 Run ALTER TABLE to add columns. Handle "column already exists" gracefully:
+
 - `clippings_text TEXT` — enriched body text (capped at 5000 chars)
 - `clippings_type TEXT` — 'article' | 'post' | 'media' (from Clippings dir)
 - `clippings_merged_at TEXT` — ISO timestamp of when merge ran
@@ -112,6 +112,7 @@ Check if columns exist first with `PRAGMA table_info(bookmarks)` before ALTER.
 ### 3. Add merge to Command enum
 
 In `types.ts`:
+
 ```typescript
 export const Command = {
   // ... existing ...
@@ -122,24 +123,25 @@ export const Command = {
 ### 4. Add pipeline.merge
 
 In `pipeline.ts`:
+
 ```typescript
 import { runMerge } from "./commands/merge.ts";
 
 export const pipeline = {
   // ... existing ...
-  merge: (args: Args) => () =>
-    runMerge({ dryRun: args["dry-run"] }),
+  merge: (args: Args) => () => runMerge({ dryRun: args["dry-run"] }),
 };
 ```
 
 ### 5. Insert merge in runFull()
 
 Change `runFull()` pipeline order:
+
 ```typescript
 const stepList = [
   ["Sync", pipeline.sync(args)],
   ["Extract", pipeline.extract(args)],
-  ["Merge", pipeline.merge(args)],       // ← NEW
+  ["Merge", pipeline.merge(args)], // ← NEW
   ["Classify", pipeline.classify(args)],
   ["Generate", pipeline.generate()],
   ["Indexes", pipeline.indexes()],

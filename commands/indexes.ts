@@ -11,23 +11,23 @@ interface BookmarkEntry {
   author_handle: string;
   author_name: string;
   posted_at: string;
-  our_primary_type: string;
-  our_primary_domain: string;
+  primary_type: string;
+  primary_domain: string;
   likes: number;
 }
 
 export const runIndexes = async (): Promise<void> => {
   logger.info("indexes started");
 
-  const db = new Database(CONFIG.dbPath);
+  const db = new Database(CONFIG.pipelineDbPath);
   try {
     const bookmarks = db.prepare(`
       SELECT tweet_id, text, author_handle, author_name, posted_at,
-             our_primary_type, our_primary_domain,
-             COALESCE(like_count, 0) as likes,
+             primary_type, primary_domain,
+             0 as likes,
              COALESCE(clippings_text, text) as display_text
       FROM bookmarks
-      WHERE our_primary_type IS NOT NULL
+      WHERE primary_type IS NOT NULL
       ORDER BY posted_at DESC
     `).all<BookmarkEntry>();
 
@@ -36,7 +36,7 @@ export const runIndexes = async (): Promise<void> => {
     // Group by category/domain using reduce
     const byCategory = bookmarks.reduce(
       (acc, b) => {
-        const cat = b.our_primary_type || "unclassified";
+        const cat = b.primary_type || "unclassified";
         return { ...acc, [cat]: [...(acc[cat] || []), b] };
       },
       {} as Record<string, BookmarkEntry[]>,
@@ -44,7 +44,7 @@ export const runIndexes = async (): Promise<void> => {
 
     const byDomain = bookmarks.reduce(
       (acc, b) => {
-        const dom = b.our_primary_domain || "uncategorized";
+        const dom = b.primary_domain || "uncategorized";
         return { ...acc, [dom]: [...(acc[dom] || []), b] };
       },
       {} as Record<string, BookmarkEntry[]>,
@@ -82,10 +82,17 @@ ${topByLikes.map((e) => formatBookmarkLine(e, "category")).join("\n\n")}
 ${entries.slice(0, 20).map((e) => formatBookmarkLine(e, "category")).join("\n\n")}
 
 ## Related Domains
-${[...new Set(entries.map((e) => e.our_primary_domain))].map((d) => `- [[domains/${d}]]`).join("\n")}
+${
+        [...new Set(entries.map((e) => e.primary_domain))].map((d) => `- [[domains/${d}]]`)
+          .join("\n")
+      }
 
 ## Top Authors
-${[...new Set(entries.map((e) => e.author_handle))].slice(0, 20).map((h) => `- [[entities/${h}]]`).join("\n")}
+${
+        [...new Set(entries.map((e) => e.author_handle))].slice(0, 20).map((h) =>
+          `- [[entities/${h}]]`
+        ).join("\n")
+      }
 `;
 
       await Deno.writeTextFile(`${categoriesDir}/${category}.md`, content);
@@ -126,10 +133,17 @@ ${topByLikes.map((e) => formatBookmarkLine(e, "domain")).join("\n\n")}
 ${entries.slice(0, 20).map((e) => formatBookmarkLine(e, "domain")).join("\n\n")}
 
 ## Related Categories
-${[...new Set(entries.map((e) => e.our_primary_type))].map((c) => `- [[categories/${c}]]`).join("\n")}
+${
+        [...new Set(entries.map((e) => e.primary_type))].map((c) => `- [[categories/${c}]]`)
+          .join("\n")
+      }
 
 ## Top Authors
-${[...new Set(entries.map((e) => e.author_handle))].slice(0, 20).map((h) => `- [[entities/${h}]]`).join("\n")}
+${
+        [...new Set(entries.map((e) => e.author_handle))].slice(0, 20).map((h) =>
+          `- [[entities/${h}]]`
+        ).join("\n")
+      }
 `;
 
       await Deno.writeTextFile(`${domainsDir}/${domain}.md`, content);
@@ -157,8 +171,8 @@ ${[...new Set(entries.map((e) => e.author_handle))].slice(0, 20).map((h) => `- [
       const topByLikes = entries.toSorted((a, b) => b.likes - a.likes).slice(0, 50);
       const authorName = entries[0]?.author_name || handle;
 
-      const categories = [...new Set(entries.map((e) => e.our_primary_type))];
-      const domains = [...new Set(entries.map((e) => e.our_primary_domain))];
+      const categories = [...new Set(entries.map((e) => e.primary_type))];
+      const domains = [...new Set(entries.map((e) => e.primary_domain))];
 
       const content = `---
 type: entity
@@ -218,9 +232,11 @@ ${DOMAINS.map((d) => `- [[domains/${d}|${d}]] (${byDomain[d]?.length || 0})`).jo
 
 ## Top Entities
 
-${topEntities.map(([handle, entries]) =>
-  `- [[entities/${handle}|@${handle}]] (${entries.length})`
-).join("\n")}
+${
+      topEntities.map(([handle, entries]) =>
+        `- [[entities/${handle}|@${handle}]] (${entries.length})`
+      ).join("\n")
+    }
 `;
 
     await Deno.writeTextFile(`${CONFIG.mdOutputDir}/index.md`, masterContent);
@@ -236,7 +252,7 @@ type LinkType = "category" | "domain";
 
 const formatBookmarkLine = (b: BookmarkEntry, linkType: LinkType): string => {
   const date = b.posted_at ? new Date(b.posted_at).toISOString().split("T")[0] : "unknown";
-  const linkTarget = linkType === "category" ? b.our_primary_type : b.our_primary_domain;
+  const linkTarget = linkType === "category" ? b.primary_type : b.primary_domain;
   const textPreview = b.display_text.length > 120
     ? b.display_text.slice(0, 120) + "..."
     : b.display_text;

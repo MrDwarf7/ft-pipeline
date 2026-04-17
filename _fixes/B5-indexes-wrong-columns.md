@@ -1,15 +1,15 @@
 # B5 — Indexes reads wrong columns, missing entity pages
-**Priority:** P2 — Important
-**Status:** Generates broken index pages referencing ft's old data
+
+**Priority:** P2 — Important **Status:** Generates broken index pages referencing ft's old data
 
 ## Problem
 
-indexes.ts reads from `primary_category` and `primary_domain` (ft's old columns)
-instead of `our_primary_type` and `our_primary_domain` (our classification).
-After B2 fixes classify to write `our_*` columns, the indexes will be reading
-stale/empty data.
+indexes.ts reads from `primary_category` and `primary_domain` (ft's old columns) instead of
+`our_primary_type` and `our_primary_domain` (our classification). After B2 fixes classify to write
+`our_*` columns, the indexes will be reading stale/empty data.
 
 Also missing from the agreed plan:
+
 1. **Entity pages** — per-author pages for authors with 5+ bookmarks
 2. **Cross-links** — `[[domains/agentic]]`, `[[categories/technique]]`, `[[entities/handle]]`
 3. **Enriched content summaries** — index entries should use clippings_text, not just tweet text
@@ -49,12 +49,12 @@ const bookmarks = db.prepare(`
 interface BookmarkEntry {
   tweet_id: string;
   text: string;
-  display_text: string;        // ← enriched text (clippings or original)
+  display_text: string; // ← enriched text (clippings or original)
   author_handle: string;
   author_name: string;
   posted_at: string;
-  our_primary_type: string;    // ← was primary_category
-  our_primary_domain: string;  // ← was primary_domain
+  our_primary_type: string; // ← was primary_category
+  our_primary_domain: string; // ← was primary_domain
   likes: number;
 }
 ```
@@ -196,9 +196,10 @@ ${DOMAINS.map((d) => `- [[domains/${d}|${d}]] (${byDomain[d]?.length || 0})`).jo
 
 ## Top Entities
 
-${topEntities.map(([handle, entries]) =>
-  `- [[entities/${handle}|@${handle}]] (${entries.length})`
-).join("\n")}
+${
+  topEntities.map(([handle, entries]) => `- [[entities/${handle}|@${handle}]] (${entries.length})`)
+    .join("\n")
+}
 `;
 ```
 

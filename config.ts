@@ -1,9 +1,9 @@
-#!/usr/bin/env -S deno run --allow-env --allow-read --allow-write
 // config.ts -- All paths and settings in one place
 
 export const CONFIG = {
-  // Paths
-  dbPath: `${Deno.env.get("HOME")}/.ft-bookmarks/bookmarks.db`,
+  // Paths — ft DB is READ-ONLY source, pipeline DB is ours
+  ftDbPath: `${Deno.env.get("HOME")}/.ft-bookmarks/bookmarks.db`,
+  pipelineDbPath: new URL("./pipeline.db", import.meta.url).pathname,
   bookmarksJsonl: `${Deno.env.get("HOME")}/.ft-bookmarks/bookmarks.jsonl`,
   cookiesPath: `${Deno.env.get("HOME")}/.ft-bookmarks/.sync-cookies.enc`,
   mdOutputDir: `${Deno.env.get("HOME")}/.ft-bookmarks/md`,

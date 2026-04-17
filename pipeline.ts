@@ -1,6 +1,10 @@
 // pipeline.ts -- Pipeline composition and full run orchestration
+//
+// Key change: we READ from ft's bookmarks.db but WRITE to our own pipeline.db.
+// Migrate creates our schema. Sync copies from ft DB into ours.
 
 import { Args, getPassword } from "./types.ts";
+import { runMigrate } from "./commands/migrate.ts";
 import { runSync } from "./commands/sync.ts";
 import { runExtract } from "./commands/extract.ts";
 import { runMerge } from "./commands/merge.ts";
@@ -17,6 +21,8 @@ const llm = createOpenAICompat({
 });
 
 export const pipeline = {
+  migrate: () => () => runMigrate(),
+
   sync: (args: Args) => () =>
     runSync(getPassword(args), {
       maxPages: args["max-pages"] ? Number(args["max-pages"]) : undefined,
@@ -34,8 +40,7 @@ export const pipeline = {
       skipExisting: args["skip-existing"],
     }),
 
-  merge: (args: Args) => () =>
-    runMerge({ dryRun: args["dry-run"] }),
+  merge: (args: Args) => () => runMerge({ dryRun: args["dry-run"] }),
 
   classify: (args: Args) => async () => {
     const connected = await llm.check();
@@ -51,6 +56,7 @@ export const pipeline = {
 
 export const runFull = async (args: Args) => {
   const stepList = [
+    ["Migrate", pipeline.migrate()],
     ["Sync", pipeline.sync(args)],
     ["Extract", pipeline.extract(args)],
     ["Merge", pipeline.merge(args)],

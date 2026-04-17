@@ -35,7 +35,6 @@ interface XtracticleResponse {
 }
 
 interface Row {
-  id: string;
   tweet_id: string;
   url: string;
   text: string;
@@ -59,7 +58,9 @@ const buildFilename = (tweet: XtracticleResponse["tweets"][0]): string => {
 };
 
 /** Parse Twitter date string (e.g. "Fri Aug 28 11:05:56 +0000 2020") or ISO date */
-const parseDate = (dateStr: string): { year: string; month: string; day: string; dow: string } | null => {
+const parseDate = (
+  dateStr: string,
+): { year: string; month: string; day: string; dow: string } | null => {
   if (!dateStr) return null;
 
   // ISO format: "2024-07-17" or "2024-07-17T..."
@@ -73,10 +74,25 @@ const parseDate = (dateStr: string): { year: string; month: string; day: string;
   }
 
   // Twitter format: "Fri Aug 28 11:05:56 +0000 2020"
-  const match = dateStr.match(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+\d{2}:\d{2}:\d{2}\s+[+\-]\d{4}\s+(\d{4})$/);
+  const match = dateStr.match(
+    /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+\d{2}:\d{2}:\d{2}\s+[+\-]\d{4}\s+(\d{4})$/,
+  );
   if (match) {
     const [, dow, monthStr, day, year] = match;
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
     const month = String(monthNames.indexOf(monthStr) + 1).padStart(2, "0");
     return { year, month, day: day.padStart(2, "0"), dow };
   }
@@ -90,7 +106,7 @@ const slug = (s: string): string =>
 
 const queryRows = (db: Database, limit?: number): Row[] =>
   db.prepare(`
-    SELECT id, tweet_id, url, text, author_handle, links_json, media_count
+    SELECT tweet_id, url, text, author_handle, links_json, media_count
     FROM bookmarks
     WHERE (clipping_path IS NULL OR clipping_path = '')
       AND (links_json IS NOT NULL AND links_json != '[]'
@@ -103,9 +119,11 @@ const dryRunPreview = (rows: Row[]) => {
   logger.info("dry run — showing first 5 bookmarks to extract", { total: rows.length });
   rows
     .slice(0, 5)
-    .forEach((row) => logger.info(`  [${row.tweet_id}] ${row.text.slice(0, 80)}...`, {
-      author: row.author_handle,
-    }));
+    .forEach((row) =>
+      logger.info(`  [${row.tweet_id}] ${row.text.slice(0, 80)}...`, {
+        author: row.author_handle,
+      })
+    );
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -151,18 +169,22 @@ const classifyTweet = (
   tweet: XtracticleResponse["tweets"][0],
 ): { dir: string; type: string } => {
   const hasMedia = Array.isArray(tweet.media) && tweet.media.length > 0;
-  const articleContent = (tweet.article as Record<string, unknown>)?.content as Record<string, unknown> | undefined;
+  const articleContent = (tweet.article as Record<string, unknown>)?.content as
+    | Record<string, unknown>
+    | undefined;
   const hasArticle = Array.isArray(articleContent?.blocks) &&
     (articleContent.blocks as unknown[]).length > 0;
   const textLen = (tweet.text || "").length;
   const hasLongText = textLen >= CONFIG.minPostTextLength;
 
   // Media only (short/no text, no article) → X-Media
-  if (hasMedia && !hasArticle && !hasLongText)
+  if (hasMedia && !hasArticle && !hasLongText) {
     return { dir: CONFIG.clippingDirs.media, type: "media" };
+  }
   // Article content blocks from xtracticle OR long text → X-Articles
-  if (hasArticle || hasLongText)
+  if (hasArticle || hasLongText) {
     return { dir: CONFIG.clippingDirs.articles, type: "article" };
+  }
   // Short text, no article, no direct media → X-Posts
   return { dir: CONFIG.clippingDirs.posts, type: "post" };
 };
@@ -190,9 +212,9 @@ const buildFrontmatter = (
     "extracted_via: xtracticle",
   ];
 
-  if (tweet.likes != null) lines.push(`likes: ${tweet.likes}`);
-  if (tweet.bookmarks != null) lines.push(`bookmarks: ${tweet.bookmarks}`);
-  if (tweet.views != null) lines.push(`views: ${tweet.views}`);
+  if (tweet.likes !== null) lines.push(`likes: ${tweet.likes}`);
+  if (tweet.bookmarks !== null) lines.push(`bookmarks: ${tweet.bookmarks}`);
+  if (tweet.views !== null) lines.push(`views: ${tweet.views}`);
 
   if (allTypes.length) {
     lines.push(`media_types: [${allTypes.join(", ")}]`);
@@ -250,60 +272,18 @@ const extractArticleImages = (tweet: XtracticleResponse["tweets"][0]): string[] 
   const coverUrl = (tweet.article as Record<string, unknown>)?.cover_media as
     | Record<string, unknown>
     | undefined;
-  const coverImg = (coverUrl?.media_info as Record<string, unknown>)?.original_img_url as string | undefined;
-  if (coverImg) urls.push(coverImg);
-
-  // Inline images from media_entities
-  const mediaEntities = (tweet.article as Record<string, unknown>)?.media_entities;
-  if (Array.isArray(mediaEntities)) {
-    for (const entity of mediaEntities) {
-      const url = (entity?.media_info as Record<string, unknown>)?.original_img_url as string | undefined;
-      if (url && !urls.includes(url)) urls.push(url);
-    }
-  }
-
-  return urls;
-};
-
-/** Extract image URLs from article content (cover + inline media_entities) */
-const extractArticleImages = (tweet: XtracticleResponse["tweets"][0]): string[] => {
-  const urls: string[] = [];
-
-  // Cover image
-  const coverUrl = (tweet.article as Record<string, unknown>)?.cover_media as
-    | Record<string, unknown>
+  const coverImg = (coverUrl?.media_info as Record<string, unknown>)?.original_img_url as
+    | string
     | undefined;
-  const coverImg = (coverUrl?.media_info as Record<string, unknown>)?.original_img_url as string | undefined;
   if (coverImg) urls.push(coverImg);
 
   // Inline images from media_entities
   const mediaEntities = (tweet.article as Record<string, unknown>)?.media_entities;
   if (Array.isArray(mediaEntities)) {
     for (const entity of mediaEntities) {
-      const url = (entity?.media_info as Record<string, unknown>)?.original_img_url as string | undefined;
-      if (url && !urls.includes(url)) urls.push(url);
-    }
-  }
-
-  return urls;
-};
-
-/** Extract image URLs from article content (cover + inline media_entities) */
-const extractArticleImages = (tweet: XtracticleResponse["tweets"][0]): string[] => {
-  const urls: string[] = [];
-
-  // Cover image
-  const coverUrl = (tweet.article as Record<string, unknown>)?.cover_media as
-    | Record<string, unknown>
-    | undefined;
-  const coverImg = (coverUrl?.media_info as Record<string, unknown>)?.original_img_url as string | undefined;
-  if (coverImg) urls.push(coverImg);
-
-  // Inline images from media_entities
-  const mediaEntities = (tweet.article as Record<string, unknown>)?.media_entities;
-  if (Array.isArray(mediaEntities)) {
-    for (const entity of mediaEntities) {
-      const url = (entity?.media_info as Record<string, unknown>)?.original_img_url as string | undefined;
+      const url = (entity?.media_info as Record<string, unknown>)?.original_img_url as
+        | string
+        | undefined;
       if (url && !urls.includes(url)) urls.push(url);
     }
   }
@@ -365,7 +345,9 @@ const saveClipping = async (
   return path;
 };
 
-const extractSingle = async (row: Row): Promise<{ tweetId: string; clippingPath: string | null }> => {
+const extractSingle = async (
+  row: Row,
+): Promise<{ tweetId: string; clippingPath: string | null }> => {
   const resp = await fetch(`${CONFIG.xtracticleBase}/${row.tweet_id}`);
 
   if (!resp.ok) {
@@ -412,9 +394,10 @@ const processBatch = async (
   const fetched = await Promise.all(
     rows.map((row) =>
       (skipExisting ? findExistingClipping(row.tweet_id) : Promise.resolve(null))
-        .then((existing) => existing
-          ? { tweetId: row.tweet_id, clippingPath: null, skipped: true }
-          : extractSingle(row).then((r) => ({ ...r, skipped: false }))
+        .then((existing) =>
+          existing
+            ? { tweetId: row.tweet_id, clippingPath: null, skipped: true }
+            : extractSingle(row).then((r) => ({ ...r, skipped: false }))
         )
         .catch((err) => {
           const msg = err instanceof Error ? err.message : String(err);
@@ -458,7 +441,7 @@ const summarize = (results: ExtractResult[]) => {
 export const runExtract = async (options: ExtractOptions): Promise<void> => {
   logger.info("extract started");
 
-  const db = new Database(CONFIG.dbPath);
+  const db = new Database(CONFIG.pipelineDbPath);
   db.exec("PRAGMA journal_mode=WAL");
   try {
     const rows = queryRows(db, options.limit);

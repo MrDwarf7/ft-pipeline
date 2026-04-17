@@ -1,4 +1,5 @@
 // commands/classify-db.ts -- DB operations for classification
+// Writes to our pipeline.db (NOT ft's bookmarks.db)
 
 import { Database } from "https://deno.land/x/sqlite3@0.12.0/mod.ts";
 import { logger } from "../utils/logger.ts";
@@ -8,16 +9,15 @@ export interface Row {
   tweet_id: string;
   text: string;
   author_handle: string;
-  article_text: string | null;
   clippings_text: string | null;
 }
 
 export const queryUnclassified = (db: Database, limit?: number): Row[] =>
   db
     .prepare(`
-    SELECT tweet_id, text, author_handle, article_text, clippings_text
+    SELECT tweet_id, text, author_handle, clippings_text
     FROM bookmarks
-    WHERE our_primary_type IS NULL
+    WHERE primary_type IS NULL
     ORDER BY posted_at DESC
     ${limit ? `LIMIT ${limit}` : ""}
   `)
@@ -30,7 +30,7 @@ export const dryRunPreview = (rows: Row[]) => {
     .forEach((row) =>
       logger.info(`  [${row.tweet_id}] ${row.text.slice(0, 80)}...`, {
         author: row.author_handle,
-      }),
+      })
     );
 };
 
@@ -38,12 +38,12 @@ export const markShortTweet = (db: Database, tweetId: string) => {
   const now = new Date().toISOString();
   db.prepare(`
     UPDATE bookmarks SET
-      our_type = ?,
-      our_primary_type = ?,
-      our_domains = ?,
-      our_primary_domain = ?,
-      our_classified_at = ?,
-      our_confidence = ?
+      types = ?,
+      primary_type = ?,
+      domains = ?,
+      primary_domain = ?,
+      classified_at = ?,
+      confidence = ?
     WHERE tweet_id = ?
   `).run(
     '["meme-shitpost"]',
@@ -64,12 +64,12 @@ export const saveClassification = (
   const now = new Date().toISOString();
   db.prepare(`
     UPDATE bookmarks SET
-      our_type = ?,
-      our_primary_type = ?,
-      our_domains = ?,
-      our_primary_domain = ?,
-      our_classified_at = ?,
-      our_confidence = ?
+      types = ?,
+      primary_type = ?,
+      domains = ?,
+      primary_domain = ?,
+      classified_at = ?,
+      confidence = ?
     WHERE tweet_id = ?
   `).run(
     JSON.stringify(result.types),
