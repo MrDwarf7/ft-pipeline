@@ -43,6 +43,10 @@ const main = async () => {
         await pipeline.extract(args)();
         break;
 
+      case Command.Merge:
+        await pipeline.merge(args)();
+        break;
+
       case Command.Classify:
         await pipeline.classify(args)();
         break;

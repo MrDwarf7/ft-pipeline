@@ -6,6 +6,7 @@ export const Command = {
   Cookies: "cookies",
   Sync: "sync",
   Extract: "extract",
+  Merge: "merge",
   Classify: "classify",
   Generate: "generate",
   Indexes: "indexes",

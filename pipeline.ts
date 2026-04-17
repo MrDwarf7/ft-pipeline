@@ -3,6 +3,7 @@
 import { Args, getPassword } from "./types.ts";
 import { runSync } from "./commands/sync.ts";
 import { runExtract } from "./commands/extract.ts";
+import { runMerge } from "./commands/merge.ts";
 import { runClassify } from "./commands/classify.ts";
 import { runGenerate } from "./commands/generate.ts";
 import { runIndexes } from "./commands/indexes.ts";
@@ -33,6 +34,9 @@ export const pipeline = {
       skipExisting: args["skip-existing"],
     }),
 
+  merge: (args: Args) => () =>
+    runMerge({ dryRun: args["dry-run"] }),
+
   classify: (args: Args) => async () => {
     const connected = await llm.check();
     return runClassify(connected, {
@@ -49,6 +53,7 @@ export const runFull = async (args: Args) => {
   const stepList = [
     ["Sync", pipeline.sync(args)],
     ["Extract", pipeline.extract(args)],
+    ["Merge", pipeline.merge(args)],
     ["Classify", pipeline.classify(args)],
     ["Generate", pipeline.generate()],
     ["Indexes", pipeline.indexes()],

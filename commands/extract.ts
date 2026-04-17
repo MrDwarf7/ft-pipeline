@@ -288,6 +288,29 @@ const extractArticleImages = (tweet: XtracticleResponse["tweets"][0]): string[] 
   return urls;
 };
 
+/** Extract image URLs from article content (cover + inline media_entities) */
+const extractArticleImages = (tweet: XtracticleResponse["tweets"][0]): string[] => {
+  const urls: string[] = [];
+
+  // Cover image
+  const coverUrl = (tweet.article as Record<string, unknown>)?.cover_media as
+    | Record<string, unknown>
+    | undefined;
+  const coverImg = (coverUrl?.media_info as Record<string, unknown>)?.original_img_url as string | undefined;
+  if (coverImg) urls.push(coverImg);
+
+  // Inline images from media_entities
+  const mediaEntities = (tweet.article as Record<string, unknown>)?.media_entities;
+  if (Array.isArray(mediaEntities)) {
+    for (const entity of mediaEntities) {
+      const url = (entity?.media_info as Record<string, unknown>)?.original_img_url as string | undefined;
+      if (url && !urls.includes(url)) urls.push(url);
+    }
+  }
+
+  return urls;
+};
+
 /** Extract text from X Article content blocks */
 const extractArticleText = (article: unknown): string => {
   if (!article || typeof article !== "object") return "";

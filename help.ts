@@ -11,10 +11,11 @@ Commands:
   cookies check     Check if cookies file exists
   sync              Sync bookmarks from X (requires cookies)
   extract           Extract articles via xtracticle + link to DB
+  merge             Merge Clippings enriched text back into DB
   classify          LLM classification for unclassified bookmarks
   generate          Regenerate md files from DB
   indexes           Generate category/domain index notes
-  full              Run all steps: sync -> extract -> classify -> generate -> indexes
+  full              Run all steps: sync -> extract -> merge -> classify -> generate -> indexes
 
 Options:
   -p, --password <pw>   Cookie decryption password (or FT_PIPELINE_PASSWORD env)

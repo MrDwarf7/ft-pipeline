@@ -8,7 +8,8 @@
     "build": "deno compile --allow-all -o ft-pipeline main.ts",
     "fmt": "deno fmt",
     "lint": "deno lint",
-    "check": "deno check main.ts"
+    "check": "deno check main.ts",
+    "merge": "deno run --allow-read --allow-write --allow-env main.ts merge"
   },
   "imports": {
     "@std/path": "jsr:@std/path@1",
