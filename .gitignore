@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.dev
+.env.uat
+.env.prod
+.env.*
+pnpm*
+
+.worktrees/
+
+# Local database
+pipeline.db
+pipeline.db-wal
+pipeline.db-shm
