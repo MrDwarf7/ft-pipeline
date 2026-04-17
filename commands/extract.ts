@@ -10,6 +10,15 @@ interface ExtractOptions {
   skipExisting?: boolean;
 }
 
+interface XtracticleMedia {
+  id: string;
+  url: string;
+  type: string;
+  thumbnail_url?: string;
+  duration?: number;
+  formats?: Array<{ url: string; bitrate?: number }>;
+}
+
 interface XtracticleResponse {
   tweets: Array<{
     id: string;
@@ -17,7 +26,10 @@ interface XtracticleResponse {
     text: string;
     author: { screen_name: string; name: string };
     created_at: string;
-    media?: Array<{ id: string; url: string; type: string }> | null;
+    likes?: number;
+    bookmarks?: number;
+    views?: number;
+    media?: XtracticleMedia[] | null;
     article?: Record<string, unknown> | null;
   }>;
 }
@@ -139,8 +151,9 @@ const classifyTweet = (
   tweet: XtracticleResponse["tweets"][0],
 ): { dir: string; type: string } => {
   const hasMedia = Array.isArray(tweet.media) && tweet.media.length > 0;
-  const hasArticle = Array.isArray(tweet.article?.content?.blocks) &&
-    tweet.article.content.blocks.length > 0;
+  const articleContent = (tweet.article as Record<string, unknown>)?.content as Record<string, unknown> | undefined;
+  const hasArticle = Array.isArray(articleContent?.blocks) &&
+    (articleContent.blocks as unknown[]).length > 0;
   const textLen = (tweet.text || "").length;
   const hasLongText = textLen >= CONFIG.minPostTextLength;
 
@@ -158,9 +171,16 @@ const buildFrontmatter = (
   tweet: XtracticleResponse["tweets"][0],
   type: string,
 ): string => {
-  const mediaTypes = Array.isArray(tweet.media) ? tweet.media.map((m) => m.type) : [];
+  const directTypes = [...new Set((tweet.media || []).map((m) => m.type))];
+  const articleImages = extractArticleImages(tweet);
 
-  return [
+  // Include "photo" in media_types if article has images
+  const allTypes = [...directTypes];
+  if (articleImages.length && !allTypes.includes("photo")) {
+    allTypes.push("photo");
+  }
+
+  const lines = [
     "---",
     `type: ${type}`,
     `source: ${tweet.url}`,
@@ -168,16 +188,105 @@ const buildFrontmatter = (
     `author: ${tweet.author.name} (@${tweet.author.screen_name})`,
     `date: ${tweet.created_at}`,
     "extracted_via: xtracticle",
-    type === "media" && mediaTypes.length > 0 ? `media_types: [${mediaTypes.join(", ")}]` : null,
-    "---",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ];
+
+  if (tweet.likes != null) lines.push(`likes: ${tweet.likes}`);
+  if (tweet.bookmarks != null) lines.push(`bookmarks: ${tweet.bookmarks}`);
+  if (tweet.views != null) lines.push(`views: ${tweet.views}`);
+
+  if (allTypes.length) {
+    lines.push(`media_types: [${allTypes.join(", ")}]`);
+  }
+
+  if (tweet.article) {
+    lines.push("has_article: true");
+  }
+
+  lines.push("---");
+  return lines.join("\n");
 };
 
 const buildMediaList = (
-  media?: XtracticleResponse["tweets"][0]["media"],
-): string => Array.isArray(media) ? media.map((m) => `\n\n- ${m.type}: ${m.url}`).join("") : "";
+  media: XtracticleResponse["tweets"][0]["media"],
+  articleImages: string[],
+): string => {
+  const lines: string[] = [];
+
+  // Direct tweet media (photos, videos, GIFs)
+  if (Array.isArray(media)) {
+    for (const m of media) {
+      if (m.type === "photo") {
+        lines.push(`![image](${m.url})`);
+      } else if (m.type === "video") {
+        const thumb = m.thumbnail_url ? `![video thumbnail](${m.thumbnail_url})\n` : "";
+        const bestFormat = m.formats?.length
+          ? [...m.formats].sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0))[0]
+          : null;
+        const videoUrl = bestFormat?.url || m.url;
+        const duration = m.duration ? ` (${Math.round(m.duration)}s)` : "";
+        lines.push(`${thumb}[▶ Watch video${duration}](${videoUrl})`);
+      } else if (m.type === "animated_gif") {
+        const thumb = m.thumbnail_url ? `![gif](${m.thumbnail_url})\n` : "";
+        lines.push(`${thumb}[▶ View GIF](${m.url})`);
+      }
+    }
+  }
+
+  // Article images (cover + inline) — dedup against already-added media
+  for (const url of articleImages) {
+    if (!lines.some((l) => l.includes(url))) {
+      lines.push(`![article image](${url})`);
+    }
+  }
+
+  return lines.length ? lines.join("\n\n") : "";
+};
+
+/** Extract image URLs from article content (cover + inline media_entities) */
+const extractArticleImages = (tweet: XtracticleResponse["tweets"][0]): string[] => {
+  const urls: string[] = [];
+
+  // Cover image
+  const coverUrl = (tweet.article as Record<string, unknown>)?.cover_media as
+    | Record<string, unknown>
+    | undefined;
+  const coverImg = (coverUrl?.media_info as Record<string, unknown>)?.original_img_url as string | undefined;
+  if (coverImg) urls.push(coverImg);
+
+  // Inline images from media_entities
+  const mediaEntities = (tweet.article as Record<string, unknown>)?.media_entities;
+  if (Array.isArray(mediaEntities)) {
+    for (const entity of mediaEntities) {
+      const url = (entity?.media_info as Record<string, unknown>)?.original_img_url as string | undefined;
+      if (url && !urls.includes(url)) urls.push(url);
+    }
+  }
+
+  return urls;
+};
+
+/** Extract image URLs from article content (cover + inline media_entities) */
+const extractArticleImages = (tweet: XtracticleResponse["tweets"][0]): string[] => {
+  const urls: string[] = [];
+
+  // Cover image
+  const coverUrl = (tweet.article as Record<string, unknown>)?.cover_media as
+    | Record<string, unknown>
+    | undefined;
+  const coverImg = (coverUrl?.media_info as Record<string, unknown>)?.original_img_url as string | undefined;
+  if (coverImg) urls.push(coverImg);
+
+  // Inline images from media_entities
+  const mediaEntities = (tweet.article as Record<string, unknown>)?.media_entities;
+  if (Array.isArray(mediaEntities)) {
+    for (const entity of mediaEntities) {
+      const url = (entity?.media_info as Record<string, unknown>)?.original_img_url as string | undefined;
+      if (url && !urls.includes(url)) urls.push(url);
+    }
+  }
+
+  return urls;
+};
 
 /** Extract text from X Article content blocks */
 const extractArticleText = (article: unknown): string => {
@@ -201,7 +310,8 @@ const buildClippingContent = (
   type: string,
 ): string => {
   const text = getEffectiveText(tweet);
-  const mediaList = buildMediaList(tweet.media);
+  const articleImages = extractArticleImages(tweet);
+  const mediaList = buildMediaList(tweet.media, articleImages);
 
   // Extract article title if present
   const articleTitle = tweet.article && typeof tweet.article === "object"
