@@ -24,9 +24,8 @@ interface ClassifyOptions {
 }
 
 const chunk = <T>(arr: T[], size: number): T[][] =>
-  Array.from(
-    { length: Math.ceil(arr.length / size) },
-    (_, i) => arr.slice(i * size, i * size + size),
+  Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+    arr.slice(i * size, i * size + size),
   );
 
 const classifyRow = async (
@@ -126,7 +125,9 @@ export const runClassify = async (llm: ConnectedLLM, options: ClassifyOptions): 
     const allResults: Array<{ tweet_id: string } & ClassificationResult> = [];
     const batches = chunk(rows, CONFIG.classificationBatchSize);
     const batchResults = await Promise.all(
-      batches.map((batch, i) => processBatch(db, llm, i + 1, batches.length, batch, allResults)),
+      batches.map((batch, i) =>
+        processBatch(db, llm, i + 1, batches.length, batch, allResults),
+      ),
     );
 
     const { classified, failed } = summarize(batchResults.flat());

@@ -1,11 +1,8 @@
-// llm/openai-compat.ts -- OpenAI-compatible provider (llama-server, LM Studio, etc.)
-
 import { type ConnectedLLM, type LLMChatOptions, type LLMProvider } from "./index.ts";
 
 interface OpenAICompatConfig {
   baseUrl: string;
   model: string;
-  /** How to request structured JSON output. Defaults to "json_object". */
   jsonMode?: "json_object" | "schema" | "prompt";
 }
 
@@ -45,7 +42,6 @@ export const createOpenAICompat = (config: OpenAICompatConfig): LLMProvider => {
                 };
                 break;
               case "prompt":
-                // Schema is already in the prompt — no special field needed
                 break;
             }
           }

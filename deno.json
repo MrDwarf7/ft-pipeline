@@ -1,17 +1,17 @@
 {
-  "exports": "./main.ts",
   "name": "@mrdwarf7/ft-pipeline",
+  "exports": "./src/main.ts",
   "version": "0.1.0",
   "tasks": {
-    "start": "deno run --allow-all main.ts",
-    "dev": "deno run --watch --allow-all main.ts",
-    "build": "deno compile --allow-all -o ft-pipeline main.ts",
+    "start": "deno run --allow-all src/main.ts",
+    "dev": "deno run --watch --allow-all src/main.ts",
+    "build": "deno compile --allow-all -o ft-pipeline src/main.ts",
     "fmt": "deno fmt",
     "lint": "deno lint",
-    "check": "deno check main.ts",
-    "migrate": "deno run --allow-all main.ts migrate",
-    "merge": "deno run --allow-all main.ts merge",
-    "full": "deno run --allow-all main.ts full"
+    "check": "deno check src/main.ts",
+    "migrate": "deno run --allow-all src/main.ts migrate",
+    "merge": "deno run --allow-all src/main.ts merge",
+    "full": "deno run --allow-all src/main.ts full"
   },
   "imports": {
     "@std/path": "jsr:@std/path@1",

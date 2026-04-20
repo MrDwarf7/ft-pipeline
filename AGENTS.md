@@ -142,6 +142,32 @@ Sync copies bookmarks from ft's DB into ours. Everything else reads/writes pipel
 - **FT CLI:** `~/Documents/GitHub_Projects/JavaScript/fieldtheory-cli`
 - **md output:** `~/.ft-bookmarks/md/`
 
+## Required Environment Variables
+
+The sync and full commands require these env vars. The pipeline checks for them at startup and exits
+with a clear error listing any that are missing.
+
+| Variable               | Required   | Description                                                                                                                                           |
+| ---------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FT_COOKIES_PATH`      | Sync, Full | **Absolute path** to the encrypted `.sync-cookies.enc` file. Decouples cookies location from `$HOME` so the pipeline works in sandboxed environments. |
+| `FT_PIPELINE_PASSWORD` | Sync, Full | Password to decrypt the cookies file.                                                                                                                 |
+
+Example setup:
+
+```bash
+export FT_COOKIES_PATH="/home/dwarf/.ft-bookmarks/.sync-cookies.enc"
+export FT_PIPELINE_PASSWORD="your-password-here"
+```
+
+You can put these in a `.env` file in the project root and source it:
+
+```bash
+source .env
+```
+
+The env check runs before anything else via `utils/env.ts` → `assertEnvVars()`. This utility takes a
+list of env var names and throws immediately if any are empty/missing.
+
 ## Content Classification Rules (extract)
 
 classifyTweet checks what xtracticle returns for the tweet:

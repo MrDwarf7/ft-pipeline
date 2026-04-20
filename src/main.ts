@@ -7,11 +7,15 @@
  *   deno run --allow-all main.ts <command> [options]
  */
 
+import { assertEnvVars } from "./utils/env.ts";
 import { Command, parseCliArgs } from "./types.ts";
-import { printHelp } from "./help.ts";
-import { pipeline, runFull } from "./pipeline.ts";
+import { printHelp } from "./commands/help.ts";
+import { pipeline, runFull } from "./utils/pipeline.ts";
 import { checkCookies, runCookieExtract } from "./commands/cookies.ts";
 import { logger } from "./utils/logger.ts";
+
+// Commands that need cookies + password — check env up front
+const REQUIRES_COOKIES: Set<Command> = new Set([Command.Sync, Command.Full]);
 
 const main = async () => {
   const args = parseCliArgs();
@@ -22,6 +26,17 @@ const main = async () => {
   const command = commandArg as Command;
   const subcommand = args._[1] ? String(args._[1]) : undefined;
 
+  // Check required env vars before doing anything
+  if (REQUIRES_COOKIES.has(command)) {
+    try {
+      assertEnvVars(["FT_COOKIES_PATH", "FT_PIPELINE_PASSWORD"]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error("env check failed", { error: msg });
+      Deno.exit(1);
+    }
+  }
+
   try {
     switch (command) {
       case Command.Cookies:
@@ -30,37 +45,39 @@ const main = async () => {
           const exists = await checkCookies();
           logger.info("cookies check", { exists });
         } else {
-          logger.error("usage", { hint: "ft-pipeline cookies [extract|check]" });
+          logger.error("usage", {
+            hint: "ft-pipeline cookies [extract|check]",
+          });
           Deno.exit(1);
         }
         break;
 
       case Command.Migrate:
-        pipeline.migrate()();
+        pipeline.migrate();
         break;
 
       case Command.Sync:
-        await pipeline.sync(args)();
+        await pipeline.sync(args);
         break;
 
       case Command.Extract:
-        await pipeline.extract(args)();
+        await pipeline.extract(args);
         break;
 
       case Command.Merge:
-        await pipeline.merge(args)();
+        await pipeline.merge(args);
         break;
 
       case Command.Classify:
-        await pipeline.classify(args)();
+        await pipeline.classify(args);
         break;
 
       case Command.Generate:
-        await pipeline.generate()();
+        await pipeline.generate();
         break;
 
       case Command.Indexes:
-        await pipeline.indexes()();
+        await pipeline.indexes();
         break;
 
       case Command.Full:

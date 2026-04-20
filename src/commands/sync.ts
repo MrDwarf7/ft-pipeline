@@ -57,11 +57,11 @@ const importFromFtDb = (): { imported: number; updated: number } => {
     `);
 
     const now = new Date().toISOString();
-    let imported = 0;
+    const imported = ftRows.length;
 
     pipelineDb.exec("BEGIN");
     try {
-      for (const row of ftRows) {
+      ftRows.forEach((row: (typeof ftRows)[0]) =>
         stmt.run(
           row.tweet_id,
           row.url,
@@ -72,9 +72,8 @@ const importFromFtDb = (): { imported: number; updated: number } => {
           row.links_json,
           row.media_count,
           now,
-        );
-        imported++;
-      }
+        )
+      );
       pipelineDb.exec("COMMIT");
     } catch (err) {
       pipelineDb.exec("ROLLBACK");

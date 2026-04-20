@@ -30,6 +30,7 @@ const readClippings = async (): Promise<Map<string, ClippingEntry>> => {
   const clippings = new Map<string, ClippingEntry>();
 
   for (const [type, dir] of Object.entries(CONFIG.clippingDirs)) {
+    // TODO: refactor to use functional iterator
     const dirPath = `${CONFIG.clippingsBase}/${dir}`;
     try {
       for await (const entry of Deno.readDir(dirPath)) {

@@ -1,12 +1,30 @@
 // config.ts -- All paths and settings in one place
 
+const envOrFallback = (key: string, fallback: string): string =>
+  Deno.env.get(key) ?? fallback;
+
 export const CONFIG = {
   // Paths — ft DB is READ-ONLY source, pipeline DB is ours
-  ftDbPath: `${Deno.env.get("HOME")}/.ft-bookmarks/bookmarks.db`,
-  pipelineDbPath: new URL("./pipeline.db", import.meta.url).pathname,
+  ftDbPath: envOrFallback(
+    "FT_DB_PATH",
+    `${Deno.env.get("HOME")}/.ft-bookmarks/bookmarks.db`,
+  ),
+  pipelineDbPath: new URL("../data/pipeline.db", import.meta.url).pathname,
   bookmarksJsonl: `${Deno.env.get("HOME")}/.ft-bookmarks/bookmarks.jsonl`,
-  cookiesPath: `${Deno.env.get("HOME")}/.ft-bookmarks/.sync-cookies.enc`,
-  mdOutputDir: `${Deno.env.get("HOME")}/.ft-bookmarks/md`,
+  // Cookies file — MUST be an absolute path.
+  // Set FT_COOKIES_PATH to the location of your encrypted .sync-cookies.enc file.
+  // This decouples the pipeline from $HOME, so it works in sandboxed environments.
+  //
+  //   export FT_COOKIES_PATH="/home/$USER/.ft-bookmarks/.sync-cookies.enc"
+  //
+  cookiesPath: envOrFallback(
+    "FT_COOKIES_PATH",
+    `${Deno.env.get("HOME")}/.ft-bookmarks/.sync-cookies.enc`,
+  ),
+  mdOutputDir: envOrFallback(
+    "FT_MARKDOWN_DIR",
+    `${Deno.env.get("HOME")}/.ft-bookmarks/md`,
+  ),
   clippingsBase: "/mnt/data_drive/Obsidian/StoneVault/Clippings",
 
   // Xtracticle API
