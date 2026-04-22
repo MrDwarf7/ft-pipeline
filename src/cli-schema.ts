@@ -26,14 +26,32 @@ export const COMMANDS: CommandDef[] = [
   { name: "classify", description: "LLM classification for unclassified bookmarks" },
   { name: "generate", description: "Regenerate md files from DB" },
   { name: "indexes", description: "Generate category/domain index notes" },
-  { name: "full", description: "Run all steps: sync -> extract -> merge -> classify -> generate -> indexes" },
+  {
+    name: "full",
+    description: "Run all steps: sync -> extract -> merge -> classify -> generate -> indexes",
+  },
 ];
 
 export const GLOBAL_OPTIONS: OptionDef[] = [
-  { name: "password", alias: "p", type: "string", description: "Cookie decryption password (or FT_PIPELINE_PASSWORD env)" },
+  {
+    name: "password",
+    alias: "p",
+    type: "string",
+    description: "Cookie decryption password (or FT_PIPELINE_PASSWORD env)",
+  },
   { name: "limit", type: "string", description: "Limit items to process" },
-  { name: "dry-run", type: "boolean", description: "Show what would happen without changes", default: false },
-  { name: "skip-existing", type: "boolean", description: "Skip already processed items", default: true },
+  {
+    name: "dry-run",
+    type: "boolean",
+    description: "Show what would happen without changes",
+    default: false,
+  },
+  {
+    name: "skip-existing",
+    type: "boolean",
+    description: "Skip already processed items",
+    default: true,
+  },
   { name: "help", alias: "h", type: "boolean", description: "Show this help" },
 ];
 

@@ -1,6 +1,5 @@
 // commands/cookies.ts -- Cookie extraction + encrypted storage
 
-import { crypto } from "https://deno.land/std/crypto/mod.ts";
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 

@@ -5,7 +5,7 @@
 // and writes clippings_text (capped at 5000 chars) + clippings_type + timestamp.
 // Priority: articles > posts > media (richest content wins).
 
-import { Database } from "https://deno.land/x/sqlite3@0.12.0/mod.ts";
+import { Database } from "jsr:@db/sqlite@^0.13.0";
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { extractBody, parseFrontmatter } from "../utils/frontmatter.ts";

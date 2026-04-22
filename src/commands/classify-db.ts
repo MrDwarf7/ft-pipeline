@@ -1,7 +1,7 @@
 // commands/classify-db.ts -- DB operations for classification
 // Writes to our pipeline.db (NOT ft's bookmarks.db)
 
-import { Database } from "https://deno.land/x/sqlite3@0.12.0/mod.ts";
+import { Database } from "jsr:@db/sqlite@^0.13.0";
 import { logger } from "../utils/logger.ts";
 import { type ClassificationResult } from "./classify-llm.ts";
 

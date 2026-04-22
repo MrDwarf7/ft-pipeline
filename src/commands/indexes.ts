@@ -1,6 +1,6 @@
 // commands/indexes.ts -- Generate category/domain index notes
 
-import { Database } from "https://deno.land/x/sqlite3@0.12.0/mod.ts";
+import { Database } from "jsr:@db/sqlite@^0.13.0";
 import { CONFIG, DOMAINS, TYPES } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 
@@ -71,8 +71,14 @@ const buildBookmarkSections = (
 ): PageSection[] => {
   const topByLikes = entries.toSorted((a, b) => b.likes - a.likes).slice(0, 50);
   return [
-    { heading: "Top by Engagement", body: topByLikes.map((e) => formatBookmarkLine(e, linkType)).join("\n\n") },
-    { heading: "Recent", body: entries.slice(0, 20).map((e) => formatBookmarkLine(e, linkType)).join("\n\n") },
+    {
+      heading: "Top by Engagement",
+      body: topByLikes.map((e) => formatBookmarkLine(e, linkType)).join("\n\n"),
+    },
+    {
+      heading: "Recent",
+      body: entries.slice(0, 20).map((e) => formatBookmarkLine(e, linkType)).join("\n\n"),
+    },
   ];
 };
 
@@ -87,58 +93,68 @@ const writeCategoryPages = async (byCategory: Record<string, BookmarkEntry[]>): 
   const dir = `${CONFIG.mdOutputDir}/categories`;
   await Deno.mkdir(dir, { recursive: true });
 
-  await Promise.all(Object.entries(byCategory).map(async ([category, entries]) => {
-    const sections = [
-      ...buildBookmarkSections(entries, "category"),
-      {
-        heading: "Related Domains",
-        body: [...new Set(entries.map((e) => e.primary_domain))].map((d) => `- [[domains/${d}]]`).join("\n"),
-      },
-      {
-        heading: "Top Authors",
-        body: [...new Set(entries.map((e) => e.author_handle))].slice(0, 20)
-          .map((h) => `- [[entities/${h}]]`).join("\n"),
-      },
-    ];
+  await Promise.all(
+    Object.entries(byCategory).map(async ([category, entries]) => {
+      const sections = [
+        ...buildBookmarkSections(entries, "category"),
+        {
+          heading: "Related Domains",
+          body: [...new Set(entries.map((e) => e.primary_domain))].map((d) => `- [[domains/${d}]]`)
+            .join("\n"),
+        },
+        {
+          heading: "Top Authors",
+          body: [...new Set(entries.map((e) => e.author_handle))].slice(0, 20)
+            .map((h) => `- [[entities/${h}]]`).join("\n"),
+        },
+      ];
 
-    const content = renderPage(
-      category,
-      `type: index\ncategory: ${category}\ncount: ${entries.length}\nupdated: ${new Date().toISOString()}\n`,
-      [{ heading: "", body: `${entries.length} bookmarks in this category.` }, ...sections],
-    );
+      const content = renderPage(
+        category,
+        `type: index\ncategory: ${category}\ncount: ${entries.length}\nupdated: ${
+          new Date().toISOString()
+        }\n`,
+        [{ heading: "", body: `${entries.length} bookmarks in this category.` }, ...sections],
+      );
 
-    await Deno.writeTextFile(`${dir}/${category}.md`, content);
-    logger.info("category index written", { category, count: entries.length });
-  }));
+      await Deno.writeTextFile(`${dir}/${category}.md`, content);
+      logger.info("category index written", { category, count: entries.length });
+    }),
+  );
 };
 
 const writeDomainPages = async (byDomain: Record<string, BookmarkEntry[]>): Promise<void> => {
   const dir = `${CONFIG.mdOutputDir}/domains`;
   await Deno.mkdir(dir, { recursive: true });
 
-  await Promise.all(Object.entries(byDomain).map(async ([domain, entries]) => {
-    const sections = [
-      ...buildBookmarkSections(entries, "domain"),
-      {
-        heading: "Related Categories",
-        body: [...new Set(entries.map((e) => e.primary_type))].map((c) => `- [[categories/${c}]]`).join("\n"),
-      },
-      {
-        heading: "Top Authors",
-        body: [...new Set(entries.map((e) => e.author_handle))].slice(0, 20)
-          .map((h) => `- [[entities/${h}]]`).join("\n"),
-      },
-    ];
+  await Promise.all(
+    Object.entries(byDomain).map(async ([domain, entries]) => {
+      const sections = [
+        ...buildBookmarkSections(entries, "domain"),
+        {
+          heading: "Related Categories",
+          body: [...new Set(entries.map((e) => e.primary_type))].map((c) => `- [[categories/${c}]]`)
+            .join("\n"),
+        },
+        {
+          heading: "Top Authors",
+          body: [...new Set(entries.map((e) => e.author_handle))].slice(0, 20)
+            .map((h) => `- [[entities/${h}]]`).join("\n"),
+        },
+      ];
 
-    const content = renderPage(
-      domain,
-      `type: index\ndomain: ${domain}\ncount: ${entries.length}\nupdated: ${new Date().toISOString()}\n`,
-      [{ heading: "", body: `${entries.length} bookmarks in this domain.` }, ...sections],
-    );
+      const content = renderPage(
+        domain,
+        `type: index\ndomain: ${domain}\ncount: ${entries.length}\nupdated: ${
+          new Date().toISOString()
+        }\n`,
+        [{ heading: "", body: `${entries.length} bookmarks in this domain.` }, ...sections],
+      );
 
-    await Deno.writeTextFile(`${dir}/${domain}.md`, content);
-    logger.info("domain index written", { domain, count: entries.length });
-  }));
+      await Deno.writeTextFile(`${dir}/${domain}.md`, content);
+      logger.info("domain index written", { domain, count: entries.length });
+    }),
+  );
 };
 
 const ENTITY_THRESHOLD = 5;
@@ -147,28 +163,32 @@ const writeEntityPages = async (byAuthor: Record<string, BookmarkEntry[]>): Prom
   const dir = `${CONFIG.mdOutputDir}/entities`;
   await Deno.mkdir(dir, { recursive: true });
 
-  await Promise.all(Object.entries(byAuthor).map(async ([handle, entries]) => {
-    if (entries.length < ENTITY_THRESHOLD) return;
+  await Promise.all(
+    Object.entries(byAuthor).map(async ([handle, entries]) => {
+      if (entries.length < ENTITY_THRESHOLD) return;
 
-    const authorName = entries[0]?.author_name || handle;
-    const categories = [...new Set(entries.map((e) => e.primary_type))];
-    const domains = [...new Set(entries.map((e) => e.primary_domain))];
+      const authorName = entries[0]?.author_name || handle;
+      const categories = [...new Set(entries.map((e) => e.primary_type))];
+      const domains = [...new Set(entries.map((e) => e.primary_domain))];
 
-    const sections = [
-      ...buildBookmarkSections(entries, "domain"),
-      { heading: "Categories", body: categories.map((c) => `- [[categories/${c}]]`).join("\n") },
-      { heading: "Domains", body: domains.map((d) => `- [[domains/${d}]]`).join("\n") },
-    ];
+      const sections = [
+        ...buildBookmarkSections(entries, "domain"),
+        { heading: "Categories", body: categories.map((c) => `- [[categories/${c}]]`).join("\n") },
+        { heading: "Domains", body: domains.map((d) => `- [[domains/${d}]]`).join("\n") },
+      ];
 
-    const content = renderPage(
-      `@${handle} — ${authorName}`,
-      `type: entity\nauthor: @${handle}\nauthor_name: "${authorName}"\ncount: ${entries.length}\nupdated: ${new Date().toISOString()}\n`,
-      [{ heading: "", body: `${entries.length} bookmarks from this author.` }, ...sections],
-    );
+      const content = renderPage(
+        `@${handle} — ${authorName}`,
+        `type: entity\nauthor: @${handle}\nauthor_name: "${authorName}"\ncount: ${entries.length}\nupdated: ${
+          new Date().toISOString()
+        }\n`,
+        [{ heading: "", body: `${entries.length} bookmarks from this author.` }, ...sections],
+      );
 
-    await Deno.writeTextFile(`${dir}/${handle}.md`, content);
-    logger.info("entity page written", { handle, count: entries.length });
-  }));
+      await Deno.writeTextFile(`${dir}/${handle}.md`, content);
+      logger.info("entity page written", { handle, count: entries.length });
+    }),
+  );
 };
 
 const writeMasterIndex = async (
@@ -182,7 +202,9 @@ const writeMasterIndex = async (
     .sort((a, b) => b[1].length - a[1].length)
     .slice(0, 50);
 
-  const content = `---\ntype: index\nupdated: ${new Date().toISOString()}\n---\n\n# Bookmark Index\n\nTotal: ${totalBookmarks} bookmarks\n\n## By Category\n\n${
+  const content = `---\ntype: index\nupdated: ${
+    new Date().toISOString()
+  }\n---\n\n# Bookmark Index\n\nTotal: ${totalBookmarks} bookmarks\n\n## By Category\n\n${
     TYPES.map((t) => `- [[categories/${t}|${t}]] (${byCategory[t]?.length || 0})`).join("\n")
   }\n\n## By Domain\n\n${
     DOMAINS.map((d) => `- [[domains/${d}|${d}]] (${byDomain[d]?.length || 0})`).join("\n")

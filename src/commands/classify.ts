@@ -1,6 +1,6 @@
 // commands/classify.ts -- LLM classification via local Gemma (orchestrator)
 
-import { Database } from "https://deno.land/x/sqlite3@0.12.0/mod.ts";
+import { Database } from "jsr:@db/sqlite@^0.13.0";
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { type ConnectedLLM } from "../llm/index.ts";

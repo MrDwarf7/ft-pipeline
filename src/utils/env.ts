@@ -1,10 +1,16 @@
 // utils/env.ts -- Required environment variable checker + .env loader
 //
-// assertEnvVars loads .env from the project root (if it exists) on first
-// call, setting any vars that aren't already in Deno.env. Then throws if
-// any required vars are still missing.
+// assertEnvVars loads .env from the pipeline's data directory (if it exists) on first
+// call, setting any vars that aren't already in Deno.env. Then throws if any required
+// vars are still missing.
 
-const PROJECT_ROOT = new URL("../..", import.meta.url).pathname;
+export const envOrFallback = (key: string, fallback: string): string =>
+  Deno.env.get(key) ?? fallback;
+
+export const DATA_HOME = envOrFallback(
+  "FT_PIPELINE_HOME",
+  `${Deno.env.get("HOME") ?? `${Deno.cwd()}`}`,
+);
 
 const parseEnvFile = (content: string): Record<string, string> =>
   content
@@ -17,7 +23,7 @@ const parseEnvFile = (content: string): Record<string, string> =>
         if (eqIdx < 0) return acc;
         const key = line.slice(0, eqIdx).trim();
         const raw = line.slice(eqIdx + 1).trim();
-        const value = raw.replace(/^["']|["']$/g, "");
+        const value = raw.replace(/^[\"']|[\"']$/g, "");
         return { ...acc, [key]: value };
       },
       {} as Record<string, string>,
@@ -29,7 +35,7 @@ const loadDotEnv = (): void => {
   if (dotenvLoaded) return;
 
   try {
-    const vars = parseEnvFile(Deno.readTextFileSync(`${PROJECT_ROOT}.env`));
+    const vars = parseEnvFile(Deno.readTextFileSync(`${DATA_HOME}/.env`));
     Object.entries(vars).forEach(([k, v]) => Deno.env.set(k, v));
     dotenvLoaded = true;
   } catch {
@@ -46,7 +52,7 @@ export const assertEnvVars = (required: string[]): void => {
 
   const list = missing.map((n) => `  - ${n}`).join("\n");
   throw new Error(
-    `Missing required environment variable(s):\n${list}\n\n` +
-      `Set these in your environment or add them to ${PROJECT_ROOT}.env`,
+    `Missing required environment variable(s):\\n${list}\\n\\n` +
+      `Set these in your environment or add them to ${DATA_HOME}/.env`,
   );
 };

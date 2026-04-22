@@ -5,19 +5,26 @@
   "tasks": {
     "start": "deno run --allow-all src/main.ts",
     "dev": "deno run --watch --allow-all src/main.ts",
-    "build": "deno compile --allow-all -o ft-pipeline src/main.ts",
-    "fmt": "deno fmt",
-    "lint": "deno lint",
-    "check": "deno check src/main.ts",
-    "migrate": "deno run --allow-all src/main.ts migrate",
-    "merge": "deno run --allow-all src/main.ts merge",
-    "full": "deno run --allow-all src/main.ts full"
+    "dev:migrate": "deno run --allow-all src/main.ts migrate",
+    "dev:merge": "deno run --allow-all src/main.ts merge",
+    "dev:full": "deno run --allow-all src/main.ts full",
+    "ch:fmt": "deno fmt",
+    "ch:check": "deno check src/main.ts",
+    "ch:lint": "deno lint",
+    "ch:all": "deno fmt && deno check src/main.ts && deno lint",
+    "build": "deno compile --allow-all -o dist/ft-pipeline src/main.ts",
+    "stage:build": "FT_PIPELINE_ENV=development deno task build",
+    "stage": "FT_PIPELINE_ENV=development deno task stage:build && FT_PIPELINE_ENV=development ./dist/ft-pipeline",
+    "release:build": "FT_PIPELINE_ENV=production deno task build",
+    "release": "FT_PIPELINE_ENV=production deno task release:build && FT_PIPELINE_ENV=production ./dist/ft-pipeline"
   },
   "imports": {
+    "@db/sqlite": "https://deno.land/x/sqlite@v3.9.1/mod.ts",
     "@std/path": "jsr:@std/path@1",
     "@std/fs": "jsr:@std/fs@1",
     "@std/cli": "jsr:@std/cli@1",
-    "@std/log": "jsr:@std/log@0.224"
+    "@std/log": "jsr:@std/log@0.224",
+    "sqlite3": "jsr:@db/sqlite@0.13"
   },
   "fmt": {
     "useTabs": false,
@@ -44,7 +51,7 @@
       ]
     }
   },
-  "nodeModulesDir": "none",
+  "nodeModulesDir": "auto",
   "unstable": [
     "ffi"
   ]

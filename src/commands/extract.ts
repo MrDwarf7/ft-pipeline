@@ -1,6 +1,6 @@
 // commands/extract.ts -- Extract articles via xtracticle + link to DB
 
-import { Database } from "https://deno.land/x/sqlite3@0.12.0/mod.ts";
+import { Database } from "jsr:@db/sqlite@^0.13.0";
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 
@@ -375,7 +375,11 @@ const extractSingle = async (
 
   if (!resp.ok) {
     logger.error("xtracticle fetch failed", { tweet_id: row.tweet_id, status: resp.status });
-    return { tweetId: row.tweet_id, clippingPath: null, extractStatus: resp.status === 404 ? "404" : "error" };
+    return {
+      tweetId: row.tweet_id,
+      clippingPath: null,
+      extractStatus: resp.status === 404 ? "404" : "error",
+    };
   }
 
   const data: XtracticleResponse = await resp.json();
@@ -405,7 +409,11 @@ const extractSingle = async (
   }
 
   await sleep(randomDelay());
-  return { tweetId: row.tweet_id, clippingPath, extractStatus: clippingPath ? "extracted" : "error" };
+  return {
+    tweetId: row.tweet_id,
+    clippingPath,
+    extractStatus: clippingPath ? "extracted" : "error",
+  };
 };
 
 const processBatch = async (
@@ -419,13 +427,23 @@ const processBatch = async (
       (skipExisting ? findExistingClipping(row.tweet_id) : Promise.resolve(null))
         .then((existing) =>
           existing
-            ? { tweetId: row.tweet_id, clippingPath: existing, extractStatus: "extracted" as string, skipped: true }
+            ? {
+              tweetId: row.tweet_id,
+              clippingPath: existing,
+              extractStatus: "extracted" as string,
+              skipped: true,
+            }
             : extractSingle(row).then((r) => ({ ...r, skipped: false }))
         )
         .catch((err) => {
           const msg = err instanceof Error ? err.message : String(err);
           logger.error("extract failed", { tweet_id: row.tweet_id, error: msg });
-          return { tweetId: row.tweet_id, clippingPath: null, extractStatus: "error" as string, skipped: false };
+          return {
+            tweetId: row.tweet_id,
+            clippingPath: null,
+            extractStatus: "error" as string,
+            skipped: false,
+          };
         })
     ),
   );
@@ -434,13 +452,17 @@ const processBatch = async (
   const results: ExtractResult[] = [];
   for (const { tweetId, clippingPath, extractStatus, skipped } of fetched) {
     if (skipped) {
-      db.prepare("UPDATE bookmarks SET clipping_path = ?, extract_status = 'extracted' WHERE tweet_id = ?")
+      db.prepareQuery(
+        "UPDATE bookmarks SET clipping_path = ?, extract_status = 'extracted' WHERE tweet_id = ?",
+      )
         .run(clippingPath, tweetId);
       results.push("skipped");
       continue;
     }
     if (clippingPath) {
-      db.prepare("UPDATE bookmarks SET clipping_path = ?, extract_status = 'extracted' WHERE tweet_id = ?")
+      db.prepareQuery(
+        "UPDATE bookmarks SET clipping_path = ?, extract_status = 'extracted' WHERE tweet_id = ?",
+      )
         .run(clippingPath, tweetId);
       results.push("extracted");
     } else {

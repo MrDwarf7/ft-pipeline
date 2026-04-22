@@ -3,7 +3,9 @@
 import { logger } from "../utils/logger.ts";
 
 export const runGenerate = async (): Promise<void> => {
-  logger.info("generate started — regenerating all bookmark markdown files via fieldtheory-cli");
+  logger.info(
+    "generate started — regenerating all bookmark markdown files via fieldtheory-cli",
+  );
 
   const ftDir = `${Deno.env.get("HOME")}/Documents/GitHub_Projects/JavaScript/fieldtheory-cli`;
   const cmd = new Deno.Command("pnpm", {

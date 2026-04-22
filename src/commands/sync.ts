@@ -3,7 +3,7 @@
 // We run ft CLI sync to update ~/.ft-bookmarks/bookmarks.db (ft's DB),
 // then COPY new/updated bookmarks into our own pipeline.db.
 
-import { Database } from "https://deno.land/x/sqlite3@0.12.0/mod.ts";
+import { Database } from "jsr:@db/sqlite@^0.13.0";
 import { CONFIG } from "../config.ts";
 import { checkCookies, getCookies } from "./cookies.ts";
 import { logger } from "../utils/logger.ts";

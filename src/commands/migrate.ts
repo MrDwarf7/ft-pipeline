@@ -2,7 +2,7 @@
 //
 // We own pipeline.db in /home/dwarf/.config/ft-pipeline/.
 
-import { Database } from "https://deno.land/x/sqlite3@0.12.0/mod.ts";
+import { Database } from "jsr:@db/sqlite@^0.13.0";
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 
@@ -23,7 +23,10 @@ export const runMigrate = (): void => {
   }
 
   // Migration: add extract_status if missing (20 → 21 columns)
-  if (existingCols.length === 20 && !existingCols.some((c: Record<string, unknown>) => c.name === "extract_status")) {
+  if (
+    existingCols.length === 20 &&
+    !existingCols.some((c: Record<string, unknown>) => c.name === "extract_status")
+  ) {
     logger.info("migrating: adding extract_status column");
     db.exec("ALTER TABLE bookmarks ADD COLUMN extract_status TEXT");
   }

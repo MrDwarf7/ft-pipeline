@@ -8,7 +8,7 @@ const ITERATIONS = 100_000;
 
 const deriveKey = async (
   password: string,
-  salt: Uint8Array,
+  salt: BufferSource,
 ): Promise<CryptoKey> => {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
