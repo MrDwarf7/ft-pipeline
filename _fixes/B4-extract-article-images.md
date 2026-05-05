@@ -169,11 +169,11 @@ const buildFrontmatter = (
 deno task extract --limit 5
 
 # Check the clipping file for image references
-cat /mnt/data_drive/Obsidian/StoneVault/Clippings/X-Articles/*eptwts*.md | grep -c "pbs.twimg.com"
+cat /home/dwarf/StoneVault/Clippings/X-Articles/*eptwts*.md | grep -c "pbs.twimg.com"
 # Should show image URLs (cover + inline)
 
 # Check a video-only tweet
-cat /mnt/data_drive/Obsidian/StoneVault/Clippings/X-Media/*video*.md | grep -c "Watch video"
+cat /home/dwarf/StoneVault/Clippings/X-Media/*video*.md | grep -c "Watch video"
 # Should show video links
 ```
 

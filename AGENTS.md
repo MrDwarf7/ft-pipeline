@@ -136,7 +136,7 @@ Sync copies bookmarks from ft's DB into ours. Everything else reads/writes pipel
 
 - **ft DB (read-only):** `~/.ft-bookmarks/bookmarks.db`
 - **Pipeline DB (ours):** `~/.ft-bookmarks/pipeline.db`
-- **Clippings:** `/mnt/data_drive/Obsidian/StoneVault/Clippings/`
+- **Clippings:** `/home/dwarf/StoneVault/Clippings/`
 - **LLM:** `http://localhost:1234/v1/chat/completions` (Gemma 4 E4B)
 - **Config:** `config.ts` — all paths, thresholds, taxonomy
 - **FT CLI:** `~/Documents/GitHub_Projects/JavaScript/fieldtheory-cli`

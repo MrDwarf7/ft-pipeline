@@ -14,3 +14,9 @@ pnpm*
 pipeline.db
 pipeline.db-wal
 pipeline.db-shm
+
+# Compiled binary
+ft-pipeline
+.old/
+_fixes/
+FIELDTHEORY_AUDIT.md
