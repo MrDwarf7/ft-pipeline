@@ -2,9 +2,6 @@
 // config.ts -- All paths and settings in one place
 
 // Pipeline home: FT_PIPELINE_HOME env var takes precedence, falls back to HOME
-
-// No import needed for getDataDir since we inline the logic
-
 import { DATA_HOME } from "./utils/env.ts";
 
 const envOrFallback = (key: string, fallback: string): string =>
@@ -39,6 +36,10 @@ export const CONFIG = {
   clippingsBase: envOrFallback(
     "FT_CLIPPINGS_BASE",
     `${DATA_HOME}/StoneVault/Clippings`,
+  ),
+  ftCliDir: envOrFallback(
+    "FT_CLI_DIR",
+    `${Deno.env.get("HOME")}/Documents/GitHub_Projects/JavaScript/fieldtheory-cli`,
   ),
 
   // Xtracticle API

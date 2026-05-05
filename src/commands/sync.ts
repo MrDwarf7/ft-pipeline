@@ -7,6 +7,7 @@ import { Database } from "jsr:@db/sqlite@^0.13.0";
 import { CONFIG } from "../config.ts";
 import { checkCookies, getCookies } from "./cookies.ts";
 import { logger } from "../utils/logger.ts";
+import { runFtCommand } from "../utils/ft-cli.ts";
 
 interface SyncOptions {
   maxPages?: number;
@@ -124,15 +125,7 @@ export const runSync = async (
     rebuild: options.rebuild ?? false,
   });
 
-  const ftDir = `${Deno.env.get("HOME")}/Documents/GitHub_Projects/JavaScript/fieldtheory-cli`;
-  const cmd = new Deno.Command("pnpm", {
-    args,
-    cwd: ftDir,
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-
-  const result = await cmd.output();
+  const result = await runFtCommand(args);
   if (!result.success) {
     throw new Error(`ft sync failed (exit ${result.code})`);
   }
