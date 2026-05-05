@@ -14,7 +14,7 @@ const env = getEnv();
 const root = Deno.env.get("FT_PIPELINE_HOME")
   ? path.resolve(Deno.env.get("FT_PIPELINE_HOME")!)
   : env === "DEV"
-  ? Deno.cwd()
+  ? path.resolve(Deno.env.get("HOME") ?? Deno.cwd())
   : path.dirname(path.resolve(Deno.execPath()));
 
 export const BASES = Object.freeze({

@@ -16,6 +16,7 @@ interface SyncOptions {
   rebuild?: boolean;
   continue?: boolean;
   gaps?: boolean;
+  dryRun?: boolean;
 }
 
 /** Copy bookmarks from ft's DB into our pipeline DB */
@@ -97,7 +98,12 @@ export const runSync = async (
   password: string | undefined,
   options: SyncOptions,
 ): Promise<void> => {
-  logger.info("sync started");
+  logger.info("sync started", { dryRun: options.dryRun });
+
+  if (options.dryRun) {
+    logger.info("dry run — skipping sync");
+    return;
+  }
 
   const hasCookies = await checkCookies();
   if (!hasCookies) {

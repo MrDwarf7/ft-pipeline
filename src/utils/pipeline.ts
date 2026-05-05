@@ -31,6 +31,7 @@ export const pipeline = {
       rebuild: args.rebuild,
       continue: args.continue,
       gaps: args.gaps,
+      dryRun: args["dry-run"],
     }),
 
   extract: (args: Args) =>
@@ -55,27 +56,42 @@ export const pipeline = {
 };
 
 export const runFull = async (args: Args) => {
-  const stepList = [
+  const isDryRun = args["dry-run"];
+
+  if (isDryRun) {
+    logger.info("dry run — no steps will execute", {
+      steps: [
+        "Migrate",
+        "Sync",
+        "Extract",
+        "Merge",
+        "Classify",
+        "Generate",
+        "Indexes",
+      ],
+    });
+    return;
+  }
+
+  const steps = [
     ["Migrate", pipeline.migrate],
-    ["Sync", pipeline.sync(args)],
-    ["Extract", pipeline.extract(args)],
-    ["Merge", pipeline.merge(args)],
-    ["Classify", pipeline.classify(args)],
+    ["Sync", () => pipeline.sync(args)],
+    ["Extract", () => pipeline.extract(args)],
+    ["Merge", () => pipeline.merge(args)],
+    ["Classify", () => pipeline.classify(args)],
     ["Generate", pipeline.generate],
     ["Indexes", pipeline.indexes],
   ] as const;
 
-  await stepList.reduce(
-    (chain, [name, fn], index) =>
+  await steps.reduce(
+    (chain, [name, thunk], index) =>
       chain.then(async () => {
         logger.info("pipeline step", {
           step: name,
           index: index + 1,
-          total: stepList.length,
+          total: steps.length,
         });
-        // await fn(args);
-        if (typeof fn === "function") await fn();
-        if (typeof fn === "object" && "then" in fn) await fn;
+        await thunk();
       }),
     Promise.resolve(),
   );
