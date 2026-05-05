@@ -45,7 +45,12 @@ const classifyRow = async (
     return "classified";
   }
 
-  const result = await classifyWithLLM(llm, content, row.author_handle, row.tweet_id);
+  const result = await classifyWithLLM(
+    llm,
+    content,
+    row.author_handle,
+    row.tweet_id,
+  );
   saveClassification(db, row.tweet_id, result);
   allResults.push({ tweet_id: row.tweet_id, ...result });
   logger.info("classified bookmark", {
@@ -107,7 +112,10 @@ const summarize = (results: ClassifyResult[]) => {
   };
 };
 
-export const runClassify = async (llm: ConnectedLLM, options: ClassifyOptions): Promise<void> => {
+export const runClassify = async (
+  llm: ConnectedLLM,
+  options: ClassifyOptions,
+): Promise<void> => {
   logger.info("classify started", { model: llm.modelName() ?? "unknown" });
 
   const db = new Database(CONFIG.pipelineDbPath);
@@ -131,7 +139,11 @@ export const runClassify = async (llm: ConnectedLLM, options: ClassifyOptions): 
     );
 
     const { classified, failed } = summarize(batchResults.flat());
-    logger.info("classify complete", { classified, failed, total: rows.length });
+    logger.info("classify complete", {
+      classified,
+      failed,
+      total: rows.length,
+    });
 
     // Write classification results backup
     const resultsOutput = {
@@ -143,7 +155,10 @@ export const runClassify = async (llm: ConnectedLLM, options: ClassifyOptions): 
       results: allResults,
     };
     const resultsPath = `${Deno.env.get("HOME")}/.ft-bookmarks/classification-results.json`;
-    await Deno.writeTextFile(resultsPath, JSON.stringify(resultsOutput, null, 2));
+    await Deno.writeTextFile(
+      resultsPath,
+      JSON.stringify(resultsOutput, null, 2),
+    );
     logger.info("wrote classification results backup", {
       path: resultsPath,
       count: allResults.length,

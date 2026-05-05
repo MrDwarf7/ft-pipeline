@@ -1,7 +1,7 @@
 // commands/classify-db.ts -- DB operations for classification
 // Writes to our pipeline.db (NOT ft's bookmarks.db)
 
-import { Database } from "jsr:@db/sqlite@^0.13.0";
+import { Database } from "@db/sqlite";
 import { logger } from "../utils/logger.ts";
 import { type ClassificationResult } from "./classify-llm.ts";
 
@@ -24,14 +24,14 @@ export const queryUnclassified = (db: Database, limit?: number): Row[] =>
     .all<Row>();
 
 export const dryRunPreview = (rows: Row[]) => {
-  logger.info("dry run — showing first 5 unclassified bookmarks", { total: rows.length });
-  rows
-    .slice(0, 5)
-    .forEach((row) =>
-      logger.info(`  [${row.tweet_id}] ${row.text.slice(0, 80)}...`, {
-        author: row.author_handle,
-      })
-    );
+  logger.info("dry run — showing first 5 unclassified bookmarks", {
+    total: rows.length,
+  });
+  rows.slice(0, 5).forEach((row) =>
+    logger.info(`  [${row.tweet_id}] ${row.text.slice(0, 80)}...`, {
+      author: row.author_handle,
+    })
+  );
 };
 
 export const markShortTweet = (db: Database, tweetId: string) => {

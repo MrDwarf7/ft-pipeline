@@ -47,7 +47,7 @@ const readClippings = async (): Promise<Map<string, ClippingEntry>> => {
         // Priority: articles > posts > media (richest content wins)
         const existing = clippings.get(tweetId);
         const newRank = TYPE_RANK[type] || 0;
-        const existingRank = existing ? (TYPE_RANK[existing.type] || 0) : 0;
+        const existingRank = existing ? TYPE_RANK[existing.type] || 0 : 0;
 
         if (!existing || newRank > existingRank) {
           clippings.set(tweetId, {
@@ -59,7 +59,10 @@ const readClippings = async (): Promise<Map<string, ClippingEntry>> => {
     } catch (err) {
       // Dir doesn't exist — skip silently
       if (err instanceof Deno.errors.NotFound) continue;
-      logger.warn("failed to read clippings dir", { dir: dirPath, error: String(err) });
+      logger.warn("failed to read clippings dir", {
+        dir: dirPath,
+        error: String(err),
+      });
     }
   }
 
@@ -83,7 +86,10 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
       (acc, c) => ({ ...acc, [c.type]: (acc[c.type] || 0) + 1 }),
       {} as Record<string, number>,
     );
-    logger.info("dry run — merge preview", { total: clippings.size, byType: typeCounts });
+    logger.info("dry run — merge preview", {
+      total: clippings.size,
+      byType: typeCounts,
+    });
     return;
   }
 
@@ -92,9 +98,10 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
   try {
     // Find which tweet_ids exist in the DB
     const dbIds = new Set(
-      db.prepare("SELECT tweet_id FROM bookmarks").all<{ tweet_id: string }>().map((r) =>
-        r.tweet_id
-      ),
+      db
+        .prepare("SELECT tweet_id FROM bookmarks")
+        .all<{ tweet_id: string }>()
+        .map((r) => r.tweet_id),
     );
 
     let merged = 0;
@@ -133,9 +140,13 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
 
     // Log enrichment stats
     const enrichedCount = db
-      .prepare("SELECT COUNT(*) as cnt FROM bookmarks WHERE clippings_text IS NOT NULL")
+      .prepare(
+        "SELECT COUNT(*) as cnt FROM bookmarks WHERE clippings_text IS NOT NULL",
+      )
       .all<{ cnt: number }>();
-    logger.info("DB enrichment status", { totalEnriched: enrichedCount?.[0]?.cnt ?? 0 });
+    logger.info("DB enrichment status", {
+      totalEnriched: enrichedCount?.[0]?.cnt ?? 0,
+    });
   } finally {
     db.close();
   }

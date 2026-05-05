@@ -29,11 +29,14 @@ interface XtracticleResponse {
     likes?: number;
     bookmarks?: number;
     views?: number;
-    media?: XtracticleMedia[] | {
-      all?: XtracticleMedia[];
-      photos?: XtracticleMedia[];
-      mosaic?: Record<string, unknown>;
-    } | null;
+    media?:
+      | XtracticleMedia[]
+      | {
+        all?: XtracticleMedia[];
+        photos?: XtracticleMedia[];
+        mosaic?: Record<string, unknown>;
+      }
+      | null;
     article?: Record<string, unknown> | null;
   }>;
 }
@@ -117,10 +120,14 @@ const parseDate = (
 
 /** Slugify a string for filenames */
 const slug = (s: string): string =>
-  s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
 const queryRows = (db: Database, limit?: number): Row[] =>
-  db.prepare(`
+  db
+    .prepare(`
     SELECT tweet_id, url, text, author_handle, links_json, media_count
     FROM bookmarks
     WHERE (clipping_path IS NULL OR clipping_path = '')
@@ -129,17 +136,18 @@ const queryRows = (db: Database, limit?: number): Row[] =>
            OR COALESCE(media_count, 0) > 0)
     ORDER BY posted_at DESC
     ${limit ? `LIMIT ${limit}` : ""}
-  `).all<Row>();
+  `)
+    .all<Row>();
 
 const dryRunPreview = (rows: Row[]) => {
-  logger.info("dry run — showing first 5 bookmarks to extract", { total: rows.length });
-  rows
-    .slice(0, 5)
-    .forEach((row) =>
-      logger.info(`  [${row.tweet_id}] ${row.text.slice(0, 80)}...`, {
-        author: row.author_handle,
-      })
-    );
+  logger.info("dry run — showing first 5 bookmarks to extract", {
+    total: rows.length,
+  });
+  rows.slice(0, 5).forEach((row) =>
+    logger.info(`  [${row.tweet_id}] ${row.text.slice(0, 80)}...`, {
+      author: row.author_handle,
+    })
+  );
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -210,7 +218,9 @@ const buildFrontmatter = (
   tweet: XtracticleResponse["tweets"][0],
   type: string,
 ): string => {
-  const directTypes = [...new Set(normalizeMedia(tweet.media).map((m) => m.type))];
+  const directTypes = [
+    ...new Set(normalizeMedia(tweet.media).map((m) => m.type)),
+  ];
   const articleImages = extractArticleImages(tweet);
 
   // Include "photo" in media_types if article has images
@@ -288,25 +298,26 @@ const buildMediaList = (
 };
 
 /** Extract image URLs from article content (cover + inline media_entities) */
-const extractArticleImages = (tweet: XtracticleResponse["tweets"][0]): string[] => {
+const extractArticleImages = (
+  tweet: XtracticleResponse["tweets"][0],
+): string[] => {
   const urls: string[] = [];
 
   // Cover image
   const coverUrl = (tweet.article as Record<string, unknown>)?.cover_media as
     | Record<string, unknown>
     | undefined;
-  const coverImg = (coverUrl?.media_info as Record<string, unknown>)?.original_img_url as
-    | string
-    | undefined;
+  const coverImg = (coverUrl?.media_info as Record<string, unknown>)
+    ?.original_img_url as string | undefined;
   if (coverImg) urls.push(coverImg);
 
   // Inline images from media_entities
-  const mediaEntities = (tweet.article as Record<string, unknown>)?.media_entities;
+  const mediaEntities = (tweet.article as Record<string, unknown>)
+    ?.media_entities;
   if (Array.isArray(mediaEntities)) {
     for (const entity of mediaEntities) {
-      const url = (entity?.media_info as Record<string, unknown>)?.original_img_url as
-        | string
-        | undefined;
+      const url = (entity?.media_info as Record<string, unknown>)
+        ?.original_img_url as string | undefined;
       if (url && !urls.includes(url)) urls.push(url);
     }
   }
@@ -341,7 +352,7 @@ const buildClippingContent = (
 
   // Extract article title if present
   const articleTitle = tweet.article && typeof tweet.article === "object"
-    ? (tweet.article as Record<string, unknown>).title as string || null
+    ? ((tweet.article as Record<string, unknown>).title as string) || null
     : null;
 
   return [
@@ -370,11 +381,18 @@ const saveClipping = async (
 
 const extractSingle = async (
   row: Row,
-): Promise<{ tweetId: string; clippingPath: string | null; extractStatus: string }> => {
+): Promise<{
+  tweetId: string;
+  clippingPath: string | null;
+  extractStatus: string;
+}> => {
   const resp = await fetch(`${CONFIG.xtracticleBase}/${row.tweet_id}`);
 
   if (!resp.ok) {
-    logger.error("xtracticle fetch failed", { tweet_id: row.tweet_id, status: resp.status });
+    logger.error("xtracticle fetch failed", {
+      tweet_id: row.tweet_id,
+      status: resp.status,
+    });
     return {
       tweetId: row.tweet_id,
       clippingPath: null,
@@ -385,7 +403,11 @@ const extractSingle = async (
   const data: XtracticleResponse = await resp.json();
   if (!data.tweets?.length) {
     logger.info("xtracticle returned no tweets", { tweet_id: row.tweet_id });
-    return { tweetId: row.tweet_id, clippingPath: null, extractStatus: "no_tweets" };
+    return {
+      tweetId: row.tweet_id,
+      clippingPath: null,
+      extractStatus: "no_tweets",
+    };
   }
 
   const tweet = data.tweets[0];
@@ -395,7 +417,11 @@ const extractSingle = async (
       tweet_id: row.tweet_id,
       url: tweet.url,
     });
-    return { tweetId: row.tweet_id, clippingPath: null, extractStatus: "empty" };
+    return {
+      tweetId: row.tweet_id,
+      clippingPath: null,
+      extractStatus: "empty",
+    };
   }
 
   const clippingPath = await saveClipping(data);
@@ -437,7 +463,10 @@ const processBatch = async (
         )
         .catch((err) => {
           const msg = err instanceof Error ? err.message : String(err);
-          logger.error("extract failed", { tweet_id: row.tweet_id, error: msg });
+          logger.error("extract failed", {
+            tweet_id: row.tweet_id,
+            error: msg,
+          });
           return {
             tweetId: row.tweet_id,
             clippingPath: null,
@@ -454,20 +483,19 @@ const processBatch = async (
     if (skipped) {
       db.prepareQuery(
         "UPDATE bookmarks SET clipping_path = ?, extract_status = 'extracted' WHERE tweet_id = ?",
-      )
-        .run(clippingPath, tweetId);
+      ).execute([clippingPath, tweetId]);
       results.push("skipped");
       continue;
     }
     if (clippingPath) {
       db.prepareQuery(
         "UPDATE bookmarks SET clipping_path = ?, extract_status = 'extracted' WHERE tweet_id = ?",
-      )
-        .run(clippingPath, tweetId);
+      ).execute([clippingPath, tweetId]);
       results.push("extracted");
     } else {
-      db.prepare("UPDATE bookmarks SET extract_status = ? WHERE tweet_id = ?")
-        .run(extractStatus, tweetId);
+      db.prepareQuery(
+        "UPDATE bookmarks SET extract_status = ? WHERE tweet_id = ?",
+      ).execute([extractStatus, tweetId]);
       results.push("failed");
     }
   }
@@ -527,14 +555,23 @@ export const runExtract = async (options: ExtractOptions): Promise<void> => {
             batch: i + 1,
             total: batches.length,
           });
-          const results = await processBatch(db, batch, options.skipExisting ?? false);
+          const results = await processBatch(
+            db,
+            batch,
+            options.skipExisting ?? false,
+          );
           allResults.push(...results);
         }),
       Promise.resolve(),
     );
 
     const { extracted, skipped, failed } = summarize(allResults);
-    logger.info("extract complete", { extracted, skipped, failed, total: rows.length });
+    logger.info("extract complete", {
+      extracted,
+      skipped,
+      failed,
+      total: rows.length,
+    });
   } finally {
     db.close();
   }

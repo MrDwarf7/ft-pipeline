@@ -26,21 +26,23 @@ const importFromFtDb = (): { imported: number; updated: number } => {
 
   try {
     // Read all bookmarks from ft's DB
-    const ftRows = ftDb.prepare(`
+    const ftRows = ftDb
+      .prepare(`
       SELECT tweet_id, url, text, author_handle, author_name, posted_at,
              links_json, COALESCE(media_count, 0) as media_count
       FROM bookmarks
       ORDER BY posted_at DESC
-    `).all<{
-      tweet_id: string;
-      url: string;
-      text: string;
-      author_handle: string;
-      author_name: string;
-      posted_at: string;
-      links_json: string | null;
-      media_count: number;
-    }>();
+    `)
+      .all<{
+        tweet_id: string;
+        url: string;
+        text: string;
+        author_handle: string;
+        author_name: string;
+        posted_at: string;
+        links_json: string | null;
+        media_count: number;
+      }>();
 
     // Upsert into our DB
     const stmt = pipelineDb.prepare(`
@@ -103,17 +105,30 @@ export const runSync = async (
   }
 
   if (!password) {
-    throw new Error("Password required (use --password or FT_PIPELINE_PASSWORD env)");
+    throw new Error(
+      "Password required (use --password or FT_PIPELINE_PASSWORD env)",
+    );
   }
 
   logger.info("decrypting X session cookies");
   const cookies = await getCookies(password);
 
-  const args = ["start", "sync", "--cookies", cookies.ct0, cookies.authToken, "--yes"];
+  const args = [
+    "start",
+    "sync",
+    "--cookies",
+    cookies.ct0,
+    cookies.authToken,
+    "--yes",
+  ];
 
   if (options.maxPages) args.push("--max-pages", String(options.maxPages));
-  if (options.targetAdds) args.push("--target-adds", String(options.targetAdds));
-  if (options.maxMinutes) args.push("--max-minutes", String(options.maxMinutes));
+  if (options.targetAdds) {
+    args.push("--target-adds", String(options.targetAdds));
+  }
+  if (options.maxMinutes) {
+    args.push("--max-minutes", String(options.maxMinutes));
+  }
   if (options.rebuild) args.push("--rebuild");
   if (options.continue) args.push("--continue");
   if (options.gaps) args.push("--gaps");

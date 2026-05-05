@@ -25,7 +25,9 @@ export const runMigrate = (): void => {
   // Migration: add extract_status if missing (20 → 21 columns)
   if (
     existingCols.length === 20 &&
-    !existingCols.some((c: Record<string, unknown>) => c.name === "extract_status")
+    !existingCols.some(
+      (c: Record<string, unknown>) => c.name === "extract_status",
+    )
   ) {
     logger.info("migrating: adding extract_status column");
     db.exec("ALTER TABLE bookmarks ADD COLUMN extract_status TEXT");
@@ -67,9 +69,15 @@ export const runMigrate = (): void => {
   `);
 
   // Indexes for common queries
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_bookmarks_primary_type ON bookmarks(primary_type)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_bookmarks_primary_domain ON bookmarks(primary_domain)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_bookmarks_clipping_path ON bookmarks(clipping_path)`);
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_bookmarks_primary_type ON bookmarks(primary_type)`,
+  );
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_bookmarks_primary_domain ON bookmarks(primary_domain)`,
+  );
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_bookmarks_clipping_path ON bookmarks(clipping_path)`,
+  );
 
   // Migration runs table — track what we've done
   db.exec(`
