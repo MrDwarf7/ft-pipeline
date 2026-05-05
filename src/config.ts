@@ -1,53 +1,33 @@
 // config.ts -- All paths and settings in one place
-// config.ts -- All paths and settings in one place
+// Single import point for the entire app
 
-// Pipeline home: FT_PIPELINE_HOME env var takes precedence, falls back to HOME
-import { DATA_HOME } from "./utils/env.ts";
+import { BASES } from "./utils/bases.ts";
 
-const envOrFallback = (key: string, fallback: string): string =>
-  Deno.env.get(key) ?? fallback;
+const envOrFallback = (key: string, fallback: string): string => Deno.env.get(key) ?? fallback;
 
 export const CONFIG = {
-  // ft DB path (read-only source) — independent of pipelineHome
-  ftDbPath: envOrFallback(
-    "FT_DB_PATH",
-    `${Deno.env.get("HOME") ?? ""}/.ft-bookmarks/bookmarks.db`,
-  ),
+  // ft DB path (read-only source)
+  ftDbPath: envOrFallback("FT_DB_PATH", BASES.ftDbPath),
   // Pipeline DB path — our own database
-  pipelineDbPath: envOrFallback(
-    "FT_PIPELINE_DB_PATH",
-    `${DATA_HOME}/.ft-bookmarks/pipeline.db`,
-  ),
-  bookmarksJsonl: `${DATA_HOME}/.ft-bookmarks/bookmarks.jsonl`,
+  pipelineDbPath: envOrFallback("FT_PIPELINE_DB_PATH", BASES.pipelineDbPath),
+  bookmarksJsonl: BASES.bookmarksJsonl,
   // Cookies file — MUST be an absolute path.
   // Set FT_COOKIES_PATH to the location of your encrypted .sync-cookies.enc file.
   // This decouples the pipeline from $HOME, so it works in sandboxed environments.
   //
-  //   export FT_COOKIES_PATH=\"/home/$USER/.ft-bookmarks/.sync-cookies.enc\"
+  //   export FT_COOKIES_PATH="/home/$USER/.ft-bookmarks/.sync-cookies.enc"
   //
-  cookiesPath: envOrFallback(
-    "FT_COOKIES_PATH",
-    `${DATA_HOME}/.ft-bookmarks/.sync-cookies.enc`,
-  ),
-  mdOutputDir: envOrFallback(
-    "FT_MARKDOWN_DIR",
-    `${DATA_HOME}/.ft-bookmarks/md`,
-  ),
-  clippingsBase: envOrFallback(
-    "FT_CLIPPINGS_BASE",
-    `${DATA_HOME}/StoneVault/Clippings`,
-  ),
-  ftCliDir: envOrFallback(
-    "FT_CLI_DIR",
-    `${Deno.env.get("HOME")}/Documents/GitHub_Projects/JavaScript/fieldtheory-cli`,
-  ),
+  cookiesPath: envOrFallback("FT_COOKIES_PATH", BASES.cookiesPath),
+  mdOutputDir: envOrFallback("FT_MARKDOWN_DIR", BASES.mdOutputDir),
+  clippingsBase: envOrFallback("FT_CLIPPINGS_BASE", BASES.clippingsBase),
+  ftCliDir: envOrFallback("FT_CLI_DIR", BASES.ftCliDir),
 
   // Xtracticle API
-  xtracticleBase: "https://xtracticle.com/api/thread",
+  xtracticleBase: BASES.xtracticleBase,
 
   // LLM (llama-server local)
-  llmBase: "http://localhost/1234/v1",
-  llmModel: "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
+  llmBase: BASES.llmBase,
+  llmModel: BASES.llmModel,
 
   // Timing
   syncDelayMs: 600,
