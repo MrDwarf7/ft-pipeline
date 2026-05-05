@@ -3,8 +3,7 @@
 ## READ THIS FIRST
 
 If you're an AI agent entering this repo, read this file top-to-bottom before touching anything.
-Then read `TODO.md` for the full audit of what's broken, and check `_fixes/` for detailed fix specs
-on each issue.
+Then check `TODO.md` for what's broken and `_fixes/` for the actual fix specs.
 
 **MANDATORY WORKFLOW:** After every code change, run `deno task ch:all` and ensure all checks pass
 before handing back to the user. Fix any new errors immediately — do not leave the user with
@@ -24,6 +23,8 @@ Obsidian wiki pages.
 ft-pipeline/
 ├── AGENTS.md              ← YOU ARE HERE. Read this first.
 ├── TODO.md                ← Full pipeline audit. Every function vs. the agreed plan.
+├── docs/
+│   └── feature-parity/   ← Feature parity docs: fieldtheory-cli features vs. ft-pipeline status.
 ├── _fixes/                ← Detailed fix specs (numbered by priority)
 │   ├── B1-merge-step-missing.md        P1 — Critical
 │   ├── B2-classify-wrong-columns.md    P1 — Critical
@@ -197,8 +198,6 @@ Critical rules:
 
 ## DB Schema
 
-## DB Schema (pipeline.db)
-
 ```sql
 CREATE TABLE bookmarks (
   tweet_id          TEXT PRIMARY KEY,
@@ -231,23 +230,31 @@ This is OUR database. `migrate.ts` creates it. We never touch ft's bookmarks.db.
 ```json
 {
   "tweets": [{
-    "url", "id", "text" (clean/empty), "raw_text.text",
-    "author": {"screen_name", "name"},
-    "likes", "bookmarks", "views", "is_note_tweet",
+    "url": "",
+    "id": "",
+    "text": "",
+    "raw_text": { "text": "" },
+    "author": { "screen_name": "", "name": "" },
+    "likes": 0,
+    "bookmarks": 0,
+    "views": 0,
+    "is_note_tweet": false,
     "article": {
-      "title", "preview_text",
-      "content": {"blocks": [...], "entityMap": [...]},  // DraftJS → markdown
-      "cover_media": {"media_info": {"original_img_url": "..."}},
-      "media_entities": [{"media_info": {"original_img_url": "..."}}]
+      "title": "",
+      "preview_text": "",
+      "content": { "blocks": [], "entityMap": {} }
     },
-    "media": {"all": [{"type": "video|photo|animated_gif", "url": "..."}]}
+    "media": {
+      "all": [{ "type": "video|photo|animated_gif", "url": "" }]
+    }
   }]
 }
 ```
 
 Key gotchas:
 
-- `tweet.text` is often empty for X Articles (content lives in article.content.blocks)
+- `tweet.text` is often empty for X Articles (content lives in `article.content.blocks`)
 - `tweet.media.all` = direct tweet media, separate from article media
-- Article images live in article.cover_media + article.media_entities
+- Article images live in `article.cover_media.media_info.original_img_url` and
+  `article.media_entities`
 - xtracticle response may be truncated by API — save raw JSON, process after
