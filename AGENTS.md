@@ -24,7 +24,7 @@ ft-pipeline/
 ├── AGENTS.md              ← YOU ARE HERE. Read this first.
 ├── TODO.md                ← Full pipeline audit. Every function vs. the agreed plan.
 ├── docs/
-│   └── feature-parity/   ← Feature parity docs: fieldtheory-cli features vs. ft-pipeline status.
+│   └── features/         ← In-housing plan: F0-F4 feature docs (GraphQL port, generate, extraction, folders, media).
 ├── _fixes/                ← Detailed fix specs (numbered by priority)
 │   ├── B1-merge-step-missing.md        P1 — Critical
 │   ├── B2-classify-wrong-columns.md    P1 — Critical

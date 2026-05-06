@@ -19,7 +19,7 @@
     "release": "FT_PIPELINE_ENV=production deno task release:build && FT_PIPELINE_ENV=production ./dist/ft-pipeline"
   },
   "imports": {
-    "@db/sqlite": "https://deno.land/x/sqlite@v3.9.1/mod.ts",
+    "@db/sqlite": "jsr:@db/sqlite@0.13",
     "@std/path": "jsr:@std/path@1",
     "@std/fs": "jsr:@std/fs@1",
     "@std/cli": "jsr:@std/cli@1",
