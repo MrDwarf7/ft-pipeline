@@ -90,9 +90,7 @@ export const generateHelpText = (): string => {
 
   // Align descriptions
   const cmdWidth = Math.max(...COMMANDS.map((c) => c.name.length)) + 2;
-  for (const cmd of COMMANDS) {
-    lines.push(`  ${cmd.name.padEnd(cmdWidth)}${cmd.description}`);
-  }
+  lines.push(...COMMANDS.map((cmd) => `  ${cmd.name.padEnd(cmdWidth)}${cmd.description}`));
 
   lines.push("", "Options:");
   const formattedOpts = GLOBAL_OPTIONS.map((o) => {
@@ -101,9 +99,7 @@ export const generateHelpText = (): string => {
     return { label: flag + suffix, desc: o.description };
   });
   const optWidth = Math.max(...formattedOpts.map((o) => o.label.length)) + 2;
-  for (const opt of formattedOpts) {
-    lines.push(`  ${opt.label.padEnd(optWidth)}${opt.desc}`);
-  }
+  lines.push(...formattedOpts.map((opt) => `  ${opt.label.padEnd(optWidth)}${opt.desc}`));
 
   lines.push("", "Sync options:");
   const formattedSync = SYNC_OPTIONS.map((o) => {
@@ -112,9 +108,7 @@ export const generateHelpText = (): string => {
     return { label: flag + suffix, desc: o.description };
   });
   const syncWidth = Math.max(...formattedSync.map((o) => o.label.length)) + 2;
-  for (const opt of formattedSync) {
-    lines.push(`  ${opt.label.padEnd(syncWidth)}${opt.desc}`);
-  }
+  lines.push(...formattedSync.map((opt) => `  ${opt.label.padEnd(syncWidth)}${opt.desc}`));
 
   return lines.join("\n");
 };

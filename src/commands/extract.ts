@@ -315,11 +315,18 @@ const extractArticleImages = (
   const mediaEntities = (tweet.article as Record<string, unknown>)
     ?.media_entities;
   if (Array.isArray(mediaEntities)) {
-    for (const entity of mediaEntities) {
-      const url = (entity?.media_info as Record<string, unknown>)
-        ?.original_img_url as string | undefined;
-      if (url && !urls.includes(url)) urls.push(url);
-    }
+    const newUrls = mediaEntities
+      .map(
+        (entity) =>
+          (entity?.media_info as Record<string, unknown>)?.original_img_url as
+            | string
+            | undefined,
+      )
+      .filter((url): url is string => {
+        if (url === undefined) return false;
+        return !urls.includes(url);
+      });
+    urls.push(...newUrls);
   }
 
   return urls;
@@ -478,27 +485,27 @@ const processBatch = async (
   );
 
   // Phase 2: write DB updates sequentially
-  const results: ExtractResult[] = [];
-  for (const { tweetId, clippingPath, extractStatus, skipped } of fetched) {
-    if (skipped) {
-      db.prepareQuery(
-        "UPDATE bookmarks SET clipping_path = ?, extract_status = 'extracted' WHERE tweet_id = ?",
-      ).execute([clippingPath, tweetId]);
-      results.push("skipped");
-      continue;
-    }
-    if (clippingPath) {
-      db.prepareQuery(
-        "UPDATE bookmarks SET clipping_path = ?, extract_status = 'extracted' WHERE tweet_id = ?",
-      ).execute([clippingPath, tweetId]);
-      results.push("extracted");
-    } else {
-      db.prepareQuery(
+  const results = fetched.map(
+    ({ tweetId, clippingPath, extractStatus, skipped }) => {
+      if (skipped) {
+        db.prepare(
+          "UPDATE bookmarks SET clipping_path = ?, extract_status = 'extracted' WHERE tweet_id = ?",
+        ).run([clippingPath, tweetId]);
+        return "skipped";
+      }
+      if (clippingPath) {
+        db.prepare(
+          "UPDATE bookmarks SET clipping_path = ?, extract_status = 'extracted' WHERE tweet_id = ?",
+        ).run([clippingPath, tweetId]);
+        return "extracted";
+      }
+      db.prepare(
         "UPDATE bookmarks SET extract_status = ? WHERE tweet_id = ?",
-      ).execute([extractStatus, tweetId]);
-      results.push("failed");
-    }
-  }
+      ).run([extractStatus, tweetId]);
+      return "failed";
+    },
+  );
+
   return results;
 };
 const summarize = (results: ExtractResult[]) => {
