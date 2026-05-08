@@ -108,32 +108,24 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
     let skipped = 0;
     const now = new Date().toISOString();
 
-    // Use a transaction for bulk updates
-    db.exec("BEGIN");
-    try {
-      const stmt = db.prepare(`
-        UPDATE bookmarks SET
-          clippings_text = ?,
-          clippings_type = ?,
-          clippings_merged_at = ?
-        WHERE tweet_id = ?
-          AND (clippings_text IS NULL OR clippings_merged_at IS NULL)
-      `);
+    const stmt = db.prepare(`
+      UPDATE bookmarks SET
+        clippings_text = ?,
+        clippings_type = ?,
+        clippings_merged_at = ?
+      WHERE tweet_id = ?
+        AND (clippings_text IS NULL OR clippings_merged_at IS NULL)
+    `);
 
-      for (const [tweetId, entry] of clippings) {
-        if (!dbIds.has(tweetId)) {
-          skipped++;
-          continue;
-        }
-
-        stmt.run(entry.body, entry.type, now, tweetId);
-        merged++;
+    for (const [tweetId, entry] of clippings) {
+      // TODO: refactor to use functional iterator
+      if (!dbIds.has(tweetId)) {
+        skipped++;
+        continue;
       }
 
-      db.exec("COMMIT");
-    } catch {
-      db.exec("ROLLBACK");
-      closePipelineDb();
+      stmt.run(entry.body, entry.type, now, tweetId);
+      merged++;
     }
 
     logger.info("merge complete", { merged, skipped, total: clippings.size });

@@ -491,18 +491,18 @@ const processBatch = async (
       if (skipped) {
         db.prepare(
           "UPDATE bookmarks SET clipping_path = ?, extract_status = 'extracted' WHERE tweet_id = ?",
-        ).run([clippingPath, tweetId]);
+        ).run(clippingPath, tweetId);
         return "skipped";
       }
       if (clippingPath) {
         db.prepare(
           "UPDATE bookmarks SET clipping_path = ?, extract_status = 'extracted' WHERE tweet_id = ?",
-        ).run([clippingPath, tweetId]);
+        ).run(clippingPath, tweetId);
         return "extracted";
       }
       db.prepare(
         "UPDATE bookmarks SET extract_status = ? WHERE tweet_id = ?",
-      ).run([extractStatus, tweetId]);
+      ).run(extractStatus, tweetId);
       return "failed";
     },
   );

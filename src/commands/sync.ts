@@ -39,27 +39,20 @@ const importIntoTipelineDb = (
   const now = new Date().toISOString();
   let imported = 0;
 
-  db.exec("BEGIN");
-  try {
-    tweets.forEach((tweet) => {
-      stmt.run(
-        tweet.id,
-        `https://x.com/${tweet.author.screen_name}/status/${tweet.id}`,
-        tweet.text,
-        tweet.author.screen_name,
-        tweet.author.name,
-        tweet.created_at,
-        tweet.links_json,
-        tweet.media?.all?.length ?? 0,
-        now,
-      );
-      imported++;
-    });
-    db.exec("COMMIT");
-  } catch (err) {
-    db.exec("ROLLBACK");
-    throw err;
-  }
+  tweets.forEach((tweet) => {
+    stmt.run(
+      tweet.id,
+      `https://x.com/${tweet.author.screen_name}/status/${tweet.id}`,
+      tweet.text,
+      tweet.author.screen_name,
+      tweet.author.name,
+      tweet.created_at,
+      tweet.links_json ?? null,
+      tweet.media?.all?.length ?? 0,
+      now,
+    );
+    imported++;
+  });
 
   return { imported, updated: 0 };
 };

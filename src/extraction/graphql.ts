@@ -80,8 +80,7 @@ const validateConnectivity = async (
 };
 
 // ── Jitter: random delay between requests ───────────────────
-const jitter = (): Promise<void> =>
-  new Promise((r) => setTimeout(r, 500 + Math.random() * 1000));
+const jitter = (): Promise<void> => new Promise((r) => setTimeout(r, 500 + Math.random() * 1000));
 
 // ── Response parsing (uses zod safeParse) ───────────────────
 const parseTweet = (tweetResult: Record<string, unknown>): TweetData | null => {
@@ -96,8 +95,7 @@ const parseTweet = (tweetResult: Record<string, unknown>): TweetData | null => {
   const authorCore = authorResult.core;
   const authorLegacy = authorResult.legacy;
 
-  const mediaEntities =
-    legacy.extended_entities?.media ?? legacy.entities?.media ?? [];
+  const mediaEntities = legacy.extended_entities?.media ?? legacy.entities?.media ?? [];
   const media = mediaEntities.map((m) => ({
     type: m.type,
     url: m.media_url_https ?? m.media_url ?? "",
@@ -136,44 +134,53 @@ const parseTweet = (tweetResult: Record<string, unknown>): TweetData | null => {
 const parseResponse = (
   json: Record<string, unknown>,
 ): { records: TweetData[]; nextCursor?: string } => {
-  const timeline = (json.data as Record<string, unknown>)
-    ?.bookmark_timeline_v2 as Record<string, unknown>;
-  const instructions =
-    ((timeline?.timeline as Record<string, unknown>)?.instructions as Record<
-      string,
-      unknown
-    >[]) ?? [];
+  // Match fieldtheory-cli exactly: json.data.bookmark_timeline_v2.timeline.instructions
+  const data = json.data as Record<string, unknown>;
+  const bookmarkTimeline = data?.bookmark_timeline_v2 as Record<string, unknown>;
+  const timeline = bookmarkTimeline?.timeline as Record<string, unknown>;
+  const instructions = (timeline?.instructions as unknown[]) ?? [];
 
-  const entries = instructions
-    .filter(
-      (inst) =>
-        inst.type === "TimelineAddEntries" && Array.isArray(inst.entries),
-    )
-    .flatMap((inst) => inst.entries as Record<string, unknown>[]);
+  // Extract entries from TimelineAddEntries instructions (match fieldtheory-cli loop)
+  const entries: Record<string, unknown>[] = [];
+  for (const inst of instructions) {
+    const instRecord = inst as Record<string, unknown>;
+    if (
+      instRecord.type === "TimelineAddEntries" &&
+      Array.isArray(instRecord.entries)
+    ) {
+      entries.push(...(instRecord.entries as Record<string, unknown>[]));
+    }
+  }
 
   const records: TweetData[] = [];
   let nextCursor: string | undefined;
 
-  entries.forEach((entry) => {
+  for (const entry of entries) {
+    const entryRecord = entry as Record<string, unknown>;
+
+    // Check for cursor
     if (
-      typeof entry.entryId === "string" &&
-      entry.entryId.startsWith("cursor-bottom")
+      typeof entryRecord.entryId === "string" &&
+      (entryRecord.entryId as string).startsWith("cursor-bottom")
     ) {
-      nextCursor = (entry.content as Record<string, unknown>)?.value as
-        | string
-        | undefined;
-      return;
+      nextCursor = (entryRecord.content as Record<string, unknown>)
+        ?.value as string | undefined;
+      continue;
     }
-    const itemContent = (entry.content as Record<string, unknown>)
-      ?.itemContent as Record<string, unknown>;
-    const tweetResult = ((itemContent?.tweet_results as Record<string, unknown>)
-      ?.result ?? itemContent?.tweet_results) as
-      | Record<string, unknown>
-      | undefined;
-    if (!tweetResult) return;
-    const record = parseTweet(tweetResult);
+
+    // Extract tweet result
+    const content = entryRecord.content as Record<string, unknown> | undefined;
+    const itemContent = content?.itemContent as Record<string, unknown> | undefined;
+    const tweetResult = (itemContent?.tweet_results as Record<string, unknown>)
+      ?.result ?? itemContent?.tweet_results as
+        | Record<string, unknown>
+        | undefined;
+
+    if (!tweetResult) continue;
+
+    const record = parseTweet(tweetResult as Record<string, unknown>);
     if (record) records.push(record);
-  });
+  }
 
   return { records, nextCursor };
 };
@@ -196,9 +203,7 @@ const fetchPage = async (
 
   if (response.status === 429) {
     const retryAfter = response.headers.get("retry-after");
-    const seconds = retryAfter
-      ? Number(retryAfter)
-      : Math.min(15 * Math.pow(2, attempt), 120);
+    const seconds = retryAfter ? Number(retryAfter) : Math.min(15 * Math.pow(2, attempt), 120);
     await new Promise((r) => setTimeout(r, seconds * 1000));
     return fetchPage(config, cursor, attempt + 1, count);
   }
@@ -224,9 +229,9 @@ const fetchAllPages = async (
   limit: number,
   count: number,
   existingIds: Set<string>,
-  acc: TweetData[][],
-  stalePages: number,
   cursor?: string,
+  acc: TweetData[][] = [],
+  stalePages = 0,
 ): Promise<TweetData[][]> => {
   if (acc.flat().length >= limit) return acc;
   if (stalePages >= 2) return acc; // Stop after 2 stale pages
@@ -255,16 +260,17 @@ const fetchAllPages = async (
     limit,
     count,
     existingIds,
+    nextCursor,
     newAcc,
     newStalePages,
-    nextCursor,
   );
 };
 
 // ── Helper: chunk array ─────────────────────────────────────
 const chunk = <T>(arr: T[], size: number): T[][] =>
-  Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
-    arr.slice(i * size, (i + 1) * size),
+  Array.from(
+    { length: Math.ceil(arr.length / size) },
+    (_, i) => arr.slice(i * size, (i + 1) * size),
   );
 
 // ── Public API ────────────────────────────────────────────────
@@ -314,11 +320,13 @@ const fetchBatchImpl = async (
       const batches = chunk(allTweets, 100);
 
       const results: TweetData[] = [];
-      for await (const batch of pooledMap(
-        concurrency,
-        batches,
-        (b: TweetData[]) => Promise.resolve(b), // identity fn (actual processing goes here)
-      )) {
+      for await (
+        const batch of pooledMap(
+          concurrency,
+          batches,
+          (b: TweetData[]) => Promise.resolve(b), // identity fn (actual processing goes here)
+        )
+      ) {
         results.push(...batch);
       }
 

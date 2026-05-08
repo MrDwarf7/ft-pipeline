@@ -7,5 +7,9 @@ export const runFtCommand = async (args: string[]): Promise<Deno.CommandOutput> 
     cwd: CONFIG.ftCliDir,
     stdout: "inherit",
     stderr: "inherit",
+    env: {
+      CI: "true",
+      PNPM_CONFIRM_MODULES_PURGE: "false",
+    },
   }).output();
 };
