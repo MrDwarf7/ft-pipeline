@@ -59,6 +59,24 @@ ft-pipeline/
 - **DB:** SQLite via `@db/sqlite` (Deno FFI)
 - **LLM:** Local Gemma 4 E4B via llama-server at `localhost:1234` (OpenAI-compatible)
 
+## Conventions
+
+- **NO default parameters in TypeScript — PROHIBITED.** User: "default params in any typescript is
+  prohibited. The caller ALWAYS has a better understanding of what's happening."
+- **NO lint suppression** — fix the code instead. User: "You need to listen to that shit not ignore
+  the lint. Don't silence them - FIX THEM."
+- **NO `as` casting without validation** — use zod for API response parsing
+- **NO non-null assertions (`!`)** — handle null/undefined explicitly
+- **Shortname imports only:** `@std/path`, `@std/async/pool` — never full URLs
+- **Builder pattern:** `build()` returns self, `run()` runs it
+- **1-2 params max** — use explicit options interface if more needed
+- **Functional style:** arrow functions, iterators (`map`, `filter`, `reduce`), no procedural loops
+- **Type-state patterns:** enforce operation ordering (check → fetch → process) via separate
+  interfaces
+- **Fix `no-await-in-loop` with recursion** — cursor-based pagination uses recursive calls, not
+  `while + await`
+- **Run `deno task ch:all`** after every code change — format, check, lint
+
 ## Commands
 
 ```bash

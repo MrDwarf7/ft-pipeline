@@ -1,18 +1,21 @@
 # F1 — Generate (Template-Based, Using `src/llm/`)
 
-**Priority: P1 (after F0)**
-**Goal: Kill `runFtCommand(["start", "md", "--force"])` delegation. Rewrite `generate.ts` using template closures + `src/llm/` interface.**
+**Priority: P1 (after F0)** **Goal: Kill `runFtCommand(["start", "md", "--force"])` delegation.
+Rewrite `generate.ts` using template closures + `src/llm/` interface.**
 
 ## Why Not Port `fieldtheory-cli/src/md.ts`
 
-Blake's note: *"We won't be using the same 'ft md' command... we can generate the markdown output content ourselves pretty easily, and likely with better performance too."*
+Blake's note: _"We won't be using the same 'ft md' command... we can generate the markdown output
+content ourselves pretty easily, and likely with better performance too."_
 
 The ft-cli's `md.ts`:
+
 - Only supports Claude + Codex (2 backends)
 - Uses Node.js (`crypto`, `fs`, `path`)
 - Has incremental compilation with SHA-256 hashes (we can reimplement simpler)
 
 Our `src/llm/`:
+
 - Supports OpenAI-compatible (llama-server, OpenAI, Anthropic, etc.)
 - Already in Deno/TypeScript
 - Adding a new provider = drop file in `llm/`, export from `index.ts`
@@ -111,7 +114,8 @@ All use Obsidian `[[wiki-link]]` syntax for cross-linking.
 
 ## Using `src/llm/` for Summaries
 
-For domain/category/entity pages, we might want LLM-generated summaries. Use the existing `llm/` interface:
+For domain/category/entity pages, we might want LLM-generated summaries. Use the existing `llm/`
+interface:
 
 ```typescript
 // src/commands/generate.ts
@@ -188,7 +192,8 @@ export const runGenerate = async (): Promise<void> => {
 
 ## Config Changes
 
-`config.ts` already has `mdOutputDir: envOrFallback("FT_MARKDOWN_DIR", BASES.mdOutputDir)`. No changes needed — generate outputs to `~/.ft-bookmarks/md/` via config.
+`config.ts` already has `mdOutputDir: envOrFallback("FT_MARKDOWN_DIR", BASES.mdOutputDir)`. No
+changes needed — generate outputs to `~/.ft-bookmarks/md/` via config.
 
 ## Files to Create
 
@@ -197,7 +202,8 @@ export const runGenerate = async (): Promise<void> => {
 
 ## Files to Delete (After F0 + F1 + F2 Done)
 
-- **`src/utils/ft-cli.ts`**: `runFtCommand()` helper (no longer needed after sync + generate + extract all native)
+- **`src/utils/ft-cli.ts`**: `runFtCommand()` helper (no longer needed after sync + generate +
+  extract all native)
 
 ## Conventions Checklist
 

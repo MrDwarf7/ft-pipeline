@@ -1,11 +1,13 @@
 # F0 — Base GraphQL Port (Sync In-Housing)
 
-**Priority: P0 (blocking all others)**
-**Goal: Kill `runFtCommand("start", "sync", ...)` delegation. Replace with native Deno `fetch()` calls using the `extraction/` module pattern (same as `llm/`).**
+**Priority: P0 (blocking all others)** **Goal: Kill `runFtCommand("start", "sync", ...)` delegation.
+Replace with native Deno `fetch()` calls using the `extraction/` module pattern (same as `llm/`).**
 
 ## Why This First
 
-The entire pipeline depends on `commands/sync.ts` shelling out to `fieldtheory-cli` via `pnpm start sync`. We can't in-house anything else (extract, generate, folders) without owning the sync layer. This is the foundation.
+The entire pipeline depends on `commands/sync.ts` shelling out to `fieldtheory-cli` via
+`pnpm start sync`. We can't in-house anything else (extract, generate, folders) without owning the
+sync layer. This is the foundation.
 
 ## Interface Pattern (mimic `llm/`)
 
@@ -28,7 +30,8 @@ export { createXtracticle } from "./xtracticle.ts";
 // Future: export { createWebsites } from "./websites.ts";
 ```
 
-This means adding a new source later = drop in a new file implementing `TweetSource`. Same pattern as adding an LLM provider to `llm/`.
+This means adding a new source later = drop in a new file implementing `TweetSource`. Same pattern
+as adding an LLM provider to `llm/`.
 
 ## What to Port from `fieldtheory-cli/src/graphql-bookmarks.ts`
 
@@ -36,7 +39,8 @@ This means adding a new source later = drop in a new file implementing `TweetSou
 
 ```typescript
 const BOOKMARKS_QUERY_ID = "Z9GWmP0kP2dajyckAaDUBw";
-const X_PUBLIC_BEARER = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA";
+const X_PUBLIC_BEARER =
+  "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA";
 
 const buildUrl = (cursor?: string, count = 20): string => {
   const variables = JSON.stringify({ count, cursor });
@@ -55,7 +59,8 @@ const buildHeaders = (csrfToken: string, cookieHeader?: string): Record<string, 
 });
 ```
 
-We already have cookie decryption in `commands/cookies.ts`. The `getCookies(password)` call returns `{ ct0, authToken }`. Use `ct0` as the CSRF token and cookie header.
+We already have cookie decryption in `commands/cookies.ts`. The `getCookies(password)` call returns
+`{ ct0, authToken }`. Use `ct0` as the CSRF token and cookie header.
 
 ### 2. Response Parsing
 
@@ -118,9 +123,11 @@ Port `fetchPageWithRetry()` (line 440):
 
 ### 4. DB Import (already in `sync.ts` lines 23-95)
 
-The `importFromFtDb()` function already copies from ft's DB to our `pipeline.db`. Once we fetch directly via GraphQL, skip ft's DB entirely and upsert directly into `pipeline.db`.
+The `importFromFtDb()` function already copies from ft's DB to our `pipeline.db`. Once we fetch
+directly via GraphQL, skip ft's DB entirely and upsert directly into `pipeline.db`.
 
 Modify `sync.ts` to:
+
 1. Fetch via `extraction/graphql.ts`
 2. Upsert directly into `pipeline.db` (same upsert logic, just change the source)
 
@@ -137,14 +144,18 @@ src/extraction/
 
 ## Files to Modify
 
-- **`src/commands/sync.ts`**: Rewrite to use `extraction/graphql.ts` instead of `runFtCommand()`. Remove `runFtCommand` import. Keep cookie decryption (`checkCookies`, `getCookies`).
-- **`src/commands/extract.ts`**: Refactor to import from `extraction/xtracticle.ts` and `extraction/shared.ts`. Remove duplicated `classifyTweet`, `buildFrontmatter`, etc.
+- **`src/commands/sync.ts`**: Rewrite to use `extraction/graphql.ts` instead of `runFtCommand()`.
+  Remove `runFtCommand` import. Keep cookie decryption (`checkCookies`, `getCookies`).
+- **`src/commands/extract.ts`**: Refactor to import from `extraction/xtracticle.ts` and
+  `extraction/shared.ts`. Remove duplicated `classifyTweet`, `buildFrontmatter`, etc.
 - **`src/config.ts`**: No changes needed yet (GraphQL uses same cookies).
-- **`src/utils/bases.ts`**: Add `graphqlBase`? Not needed — URL is hardcoded (it's a stable X API endpoint).
+- **`src/utils/bases.ts`**: Add `graphqlBase`? Not needed — URL is hardcoded (it's a stable X API
+  endpoint).
 
 ## DB Schema Changes
 
-None needed. The existing `bookmarks` table in `pipeline.db` already has all required fields. We're just changing the data source from ft's DB → direct X API.
+None needed. The existing `bookmarks` table in `pipeline.db` already has all required fields. We're
+just changing the data source from ft's DB → direct X API.
 
 ## Conventions Checklist
 
@@ -165,13 +176,17 @@ None needed. The existing `bookmarks` table in `pipeline.db` already has all req
 
 ## Bookmark Folders (F3) — Should We Include Now?
 
-The folder GraphQL queries (`BOOKMARK_FOLDERS_QUERY_ID`, `BOOKMARK_FOLDER_TIMELINE_QUERY_ID`) live in the same `graphql-bookmarks.ts` file. If it's easier to port them during this refactor, do it — but only if the implementation stays clean:
+The folder GraphQL queries (`BOOKMARK_FOLDERS_QUERY_ID`, `BOOKMARK_FOLDER_TIMELINE_QUERY_ID`) live
+in the same `graphql-bookmarks.ts` file. If it's easier to port them during this refactor, do it —
+but only if the implementation stays clean:
 
 - Separate `src/extraction/graphql-folders.ts` OR add folder methods to `ConnectedSource` interface
-- New DB tables: `bookmark_folders`, `bookmark_folder_tags` (see `docs/features/F3-bookmark-folders.md`)
+- New DB tables: `bookmark_folders`, `bookmark_folder_tags` (see
+  `docs/features/F3-bookmark-folders.md`)
 - New CLI flags: `--folders`, `--folder <name>`
 
-**Decision**: If folder porting adds < 100 lines and doesn't complicate the base GraphQL port, bring it. Otherwise, defer to F3.
+**Decision**: If folder porting adds < 100 lines and doesn't complicate the base GraphQL port, bring
+it. Otherwise, defer to F3.
 
 ## Success Criteria
 

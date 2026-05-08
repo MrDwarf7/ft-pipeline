@@ -1,11 +1,12 @@
 # F3 — Bookmark Folders
 
-**Priority: P3 (wanted but not needed for base functionality)**
-**Goal: Sync X bookmark folder tags, tag bookmarks, list/filter by folder. Implement natively (no ft-cli dependency).**
+**Priority: P3 (wanted but not needed for base functionality)** **Goal: Sync X bookmark folder tags,
+tag bookmarks, list/filter by folder. Implement natively (no ft-cli dependency).**
 
 ## Blake's Explicit Requirements
 
 From `docs/feature-parity/bookmark-folders.md` and conversation:
+
 - Sync X bookmark folder tags (read-only mirror)
 - Tag bookmarks with folder names
 - List/filter bookmarks by folder
@@ -15,11 +16,13 @@ From `docs/feature-parity/bookmark-folders.md` and conversation:
 ## Source Reference (ft-cli)
 
 From `fieldtheory-cli/src/graphql-bookmarks.ts`:
+
 - `BOOKMARK_FOLDERS_QUERY_ID = 'i78YDd0Tza-dV4SYs58kRg'`
 - `BOOKMARK_FOLDER_TIMELINE_QUERY_ID = 'LML09uXDwh87F1zd7pbf2w'`
 - `syncBookmarkFolders()` function (port this logic)
 
-**Important**: These GraphQL queries live in the same file as the main sync. If we're already porting `graphql-bookmarks.ts` for F0, adding folder support might be easier during that port.
+**Important**: These GraphQL queries live in the same file as the main sync. If we're already
+porting `graphql-bookmarks.ts` for F0, adding folder support might be easier during that port.
 
 ## DB Schema Changes
 
@@ -48,6 +51,7 @@ Add to `commands/migrate.ts` or create a new migration.
 ### Option A: Include in F0 (Base GraphQL Port)
 
 If porting during F0:
+
 - Add folder methods to `ConnectedSource` interface:
   ```typescript
   // src/extraction/index.ts
@@ -61,12 +65,12 @@ If porting during F0:
 - Implement in `src/extraction/graphql.ts`
 - New DB tables created before use
 
-**Pros**: One less refactor later.
-**Cons**: Might bloat F0 if folder logic is complex.
+**Pros**: One less refactor later. **Cons**: Might bloat F0 if folder logic is complex.
 
 ### Option B: Separate Implementation (F3)
 
 After F0 is done:
+
 - Create `src/extraction/graphql-folders.ts` (or add to `graphql.ts`)
 - Add folder sync to `commands/sync.ts`:
   ```typescript
@@ -78,8 +82,7 @@ After F0 is done:
   ```
 - New CLI flags: `--folders`, `--folder <name>` (add to `types.ts`)
 
-**Pros**: Cleaner separation, F0 stays focused.
-**Cons**: Two refactors of `graphql.ts` / `sync.ts`.
+**Pros**: Cleaner separation, F0 stays focused. **Cons**: Two refactors of `graphql.ts` / `sync.ts`.
 
 ## CLI Commands
 
@@ -93,6 +96,7 @@ deno task folders                  # Show folder distribution
 ```
 
 Add to `types.ts`:
+
 - `Command.Sync` flags: `--folders`, `--folder <name>`
 - `Command.List` flag: `--folder <name>`
 - `Command.Folders` (new command): Show distribution
@@ -100,6 +104,7 @@ Add to `types.ts`:
 ## Folder Name Resolution
 
 From ft-cli porting plan:
+
 - Exact match first
 - Unambiguous prefix match (case-insensitive)
 - Sanitize folder names for display (prevent terminal injection)
@@ -127,11 +132,14 @@ No new env vars needed. Folder sync reuses `FT_COOKIES_PATH` for authentication.
 
 ## Decision: F0 or F3?
 
-**Recommendation**: If folder GraphQL queries are simple (< 50 lines added to `graphql.ts`), include in F0. Otherwise, defer to F3 and keep F0 focused on base sync.
+**Recommendation**: If folder GraphQL queries are simple (< 50 lines added to `graphql.ts`), include
+in F0. Otherwise, defer to F3 and keep F0 focused on base sync.
 
-Blake's note: *"if it's simply easier to do during the initial port over of the logic — then we can bring it, but we'll want to make sure it's a proper clean impl."*
+Blake's note: _"if it's simply easier to do during the initial port over of the logic — then we can
+bring it, but we'll want to make sure it's a proper clean impl."_
 
 Clean implementation means:
+
 - Separate function for folder sync (not inline in main sync)
 - Proper error handling (folders API might fail independently)
 - No procedural spaghetti like ft-cli

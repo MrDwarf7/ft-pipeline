@@ -1,11 +1,12 @@
 # F2 — Unified Extraction (Replace xtracticle.com API)
 
-**Priority: P2 (after F0, F1)**
-**Goal: Replace xtracticle.com API call with direct X API. Unify extraction logic from ft-cli + websites repo into `src/extraction/`.**
+**Priority: P2 (after F0, F1)** **Goal: Replace xtracticle.com API call with direct X API. Unify
+extraction logic from ft-cli + websites repo into `src/extraction/`.**
 
 ## Current State
 
 `src/commands/extract.ts` line 396:
+
 ```typescript
 const resp = await fetch(`${CONFIG.xtracticleBase}/${row.tweet_id}`);
 ```
@@ -15,6 +16,7 @@ This shells out to xtracticle.com as a middleman. We want to hit X's API directl
 ## What's Already Good (Keep As-Is)
 
 The processing logic in `extract.ts` is solid:
+
 - `classifyTweet()` — content type classification (X-Articles/X-Posts/X-Media)
 - `buildFrontmatter()` — YAML frontmatter generation
 - `buildClippingContent()` — markdown assembly
@@ -43,6 +45,7 @@ git clone <websites-repo-url> ~/Documents/GitHub_Projects/websites/
 ```
 
 Compare:
+
 - How websites extracts article content
 - How ft-cli extracts article content
 - How xtracticle extracts article content
@@ -66,6 +69,7 @@ src/extraction/
 Current: Calls xtracticle API → processes response with local functions.
 
 New:
+
 1. Import from `extraction/shared.ts` for processing functions
 2. Import from `extraction/websites.ts` or `extraction/graphql.ts` for API calls
 3. Remove duplicated logic (already in `shared.ts`)
@@ -107,7 +111,8 @@ export { createWebsites } from "./websites.ts";
 ## Config Changes
 
 - **Remove `xtracticleBase`** from `config.ts` + `bases.ts` (once xtracticle is replaced)
-- **Add `websitesBase`**? Only if websites repo provides an API. If it's a library, no config needed.
+- **Add `websitesBase`**? Only if websites repo provides an API. If it's a library, no config
+  needed.
 
 ## Conventions Checklist
 

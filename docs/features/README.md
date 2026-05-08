@@ -1,16 +1,17 @@
 # Features — In-Housing Plan
 
-**Goal: Kill all `fieldtheory-cli` dependencies. Implement natively in ft-pipeline using the `llm/` interface pattern.**
+**Goal: Kill all `fieldtheory-cli` dependencies. Implement natively in ft-pipeline using the `llm/`
+interface pattern.**
 
 ## Feature List
 
-| ID  | Feature | Priority | Description | Doc |
-|-----|---------|----------|-------------|-----|
-| **F0** | **Base GraphQL Port (Sync)** | **P0** | Port `graphql-bookmarks.ts` to native Deno `fetch()`. Replace `runFtCommand("start", "sync")`. Foundation for everything else. | [F0-base-graphql-port.md](./F0-base-graphql-port.md) |
-| **F1** | **Generate (Template-Based)** | **P1** | Rewrite `generate.ts` using `src/llm/` + template closures. Kill `ft md --force` delegation. | [F1-generate.md](./F1-generate.md) |
-| **F2** | **Unified Extraction** | **P2** | Replace xtracticle.com API with direct X API. Clone websites repo, unify extraction logic into `src/extraction/`. | [F2-unified-extraction.md](./F2-unified-extraction.md) |
-| **F3** | **Bookmark Folders** | **P3** | Sync X bookmark folder tags, tag bookmarks. Wanted but not blocking. Port if easy during F0. | [F3-bookmark-folders.md](./F3-bookmark-folders.md) |
-| **F4** | **Media Download** | **P4** | Download media to configurable path. Port `bookmark-media.ts`. | [F4-media-download.md](./F4-media-download.md) |
+| ID     | Feature                       | Priority | Description                                                                                                                    | Doc                                                    |
+| ------ | ----------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| **F0** | **Base GraphQL Port (Sync)**  | **P0**   | Port `graphql-bookmarks.ts` to native Deno `fetch()`. Replace `runFtCommand("start", "sync")`. Foundation for everything else. | [F0-base-graphql-port.md](./F0-base-graphql-port.md)   |
+| **F1** | **Generate (Template-Based)** | **P1**   | Rewrite `generate.ts` using `src/llm/` + template closures. Kill `ft md --force` delegation.                                   | [F1-generate.md](./F1-generate.md)                     |
+| **F2** | **Unified Extraction**        | **P2**   | Replace xtracticle.com API with direct X API. Clone websites repo, unify extraction logic into `src/extraction/`.              | [F2-unified-extraction.md](./F2-unified-extraction.md) |
+| **F3** | **Bookmark Folders**          | **P3**   | Sync X bookmark folder tags, tag bookmarks. Wanted but not blocking. Port if easy during F0.                                   | [F3-bookmark-folders.md](./F3-bookmark-folders.md)     |
+| **F4** | **Media Download**            | **P4**   | Download media to configurable path. Port `bookmark-media.ts`.                                                                 | [F4-media-download.md](./F4-media-download.md)         |
 
 ## Implementation Pattern (mimic `llm/`)
 
@@ -24,7 +25,8 @@ src/extraction/
 └── types.ts          # TweetData, MediaItem, ArticleData
 ```
 
-Adding a new source = drop file implementing `TweetSource` interface. Same for LLM providers in `llm/`.
+Adding a new source = drop file implementing `TweetSource` interface. Same for LLM providers in
+`llm/`.
 
 ## Conventions (Your Style)
 
