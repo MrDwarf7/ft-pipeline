@@ -2,15 +2,14 @@
 //
 // We own pipeline.db in /home/dwarf/.config/ft-pipeline/.
 
-import { Database } from "jsr:@db/sqlite@^0.13.0";
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
+import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
 
 export const runMigrate = (): void => {
   logger.info("migrate started", { db: CONFIG.pipelineDbPath });
 
-  const db = new Database(CONFIG.pipelineDbPath);
-  db.exec("PRAGMA journal_mode=WAL");
+  const db = getPipelineDb();
 
   // Check if bookmarks table exists with wrong schema (e.g. ft's 46 columns)
   const existingCols = db.prepare("PRAGMA table_info(bookmarks)").all();
@@ -89,6 +88,6 @@ export const runMigrate = (): void => {
     )
   `);
 
-  db.close();
+  closePipelineDb();
   logger.info("migrate complete");
 };

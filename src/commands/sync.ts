@@ -1,13 +1,11 @@
-// commands/sync.ts -- Sync bookmarks from X via ft CLI, then import into our DB
-//
-// We run ft CLI sync to update ~/.ft-bookmarks/bookmarks.db (ft's DB),
-// then COPY new/updated bookmarks into our own pipeline.db.
+// commands/sync.ts -- Sync bookmarks from X via our own GraphQL client
+// Replaces shelling out to ft CLI
 
-import { Database } from "jsr:@db/sqlite@^0.13.0";
-import { CONFIG } from "../config.ts";
 import { checkCookies, getCookies } from "./cookies.ts";
 import { logger } from "../utils/logger.ts";
-import { runFtCommand } from "../utils/ft-cli.ts";
+import { getPipelineDb } from "../utils/db.ts";
+import { createGraphQL } from "../extraction/index.ts";
+import type { TweetData } from "../extraction/types.ts";
 
 interface SyncOptions {
   maxPages?: number;
@@ -19,79 +17,61 @@ interface SyncOptions {
   dryRun?: boolean;
 }
 
-/** Copy bookmarks from ft's DB into our pipeline DB */
-const importFromFtDb = (): { imported: number; updated: number } => {
-  const ftDb = new Database(CONFIG.ftDbPath);
-  const pipelineDb = new Database(CONFIG.pipelineDbPath);
-  pipelineDb.exec("PRAGMA journal_mode=WAL");
+// Insert new tweets into our pipeline DB
+const importIntoTipelineDb = (
+  tweets: TweetData[],
+): { imported: number; updated: number } => {
+  const db = getPipelineDb();
 
+  const stmt = db.prepare(`
+    INSERT INTO bookmarks (tweet_id, url, text, author_handle, author_name, posted_at, links_json, media_count, synced_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(tweet_id) DO UPDATE SET
+      text = excluded.text,
+      author_handle = excluded.author_handle,
+      author_name = excluded.author_name,
+      posted_at = excluded.posted_at,
+      links_json = excluded.links_json,
+      media_count = excluded.media_count,
+      synced_at = excluded.synced_at
+  `);
+
+  const now = new Date().toISOString();
+  let imported = 0;
+
+  db.exec("BEGIN");
   try {
-    // Read all bookmarks from ft's DB
-    const ftRows = ftDb
-      .prepare(`
-      SELECT tweet_id, url, text, author_handle, author_name, posted_at,
-             links_json, COALESCE(media_count, 0) as media_count
-      FROM bookmarks
-      ORDER BY posted_at DESC
-    `)
-      .all<{
-        tweet_id: string;
-        url: string;
-        text: string;
-        author_handle: string;
-        author_name: string;
-        posted_at: string;
-        links_json: string | null;
-        media_count: number;
-      }>();
-
-    // Upsert into our DB
-    const stmt = pipelineDb.prepare(`
-      INSERT INTO bookmarks (tweet_id, url, text, author_handle, author_name, posted_at, links_json, media_count, synced_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(tweet_id) DO UPDATE SET
-        url = excluded.url,
-        text = excluded.text,
-        author_handle = excluded.author_handle,
-        author_name = excluded.author_name,
-        posted_at = excluded.posted_at,
-        links_json = excluded.links_json,
-        media_count = excluded.media_count,
-        synced_at = excluded.synced_at
-    `);
-
-    const now = new Date().toISOString();
-    const imported = ftRows.length;
-
-    pipelineDb.exec("BEGIN");
-    try {
-      ftRows.forEach((row: (typeof ftRows)[0]) =>
-        stmt.run(
-          row.tweet_id,
-          row.url,
-          row.text,
-          row.author_handle,
-          row.author_name,
-          row.posted_at,
-          row.links_json,
-          row.media_count,
-          now,
-        )
+    tweets.forEach((tweet) => {
+      stmt.run(
+        tweet.id,
+        `https://x.com/${tweet.author.screen_name}/status/${tweet.id}`,
+        tweet.text,
+        tweet.author.screen_name,
+        tweet.author.name,
+        tweet.created_at,
+        tweet.links_json,
+        tweet.media?.all?.length ?? 0,
+        now,
       );
-      pipelineDb.exec("COMMIT");
-    } catch (err) {
-      pipelineDb.exec("ROLLBACK");
-      throw err;
-    }
-
-    ftDb.close();
-    pipelineDb.close();
-    return { imported, updated: 0 };
+      imported++;
+    });
+    db.exec("COMMIT");
   } catch (err) {
-    ftDb.close();
-    pipelineDb.close();
+    db.exec("ROLLBACK");
     throw err;
   }
+
+  return { imported, updated: 0 };
+};
+
+// Query existing tweet IDs from our DB
+const getExistingIds = (): Set<string> => {
+  const db = getPipelineDb();
+
+  const rows = db.prepare("SELECT tweet_id FROM bookmarks").all<{
+    tweet_id: string;
+  }>();
+  return new Set(rows.map((r) => r.tweet_id));
 };
 
 export const runSync = async (
@@ -118,40 +98,40 @@ export const runSync = async (
 
   logger.info("decrypting X session cookies");
   const cookies = await getCookies(password);
+  const csrfToken = cookies.ct0;
+  const cookieHeader = `ct0=${csrfToken}; auth_token=${cookies.authToken}`;
 
-  const args = [
-    "start",
-    "sync",
-    "--cookies",
-    cookies.ct0,
-    cookies.authToken,
-    "--yes",
-  ];
-
-  if (options.maxPages) args.push("--max-pages", String(options.maxPages));
-  if (options.targetAdds) {
-    args.push("--target-adds", String(options.targetAdds));
+  if (!options.rebuild) {
+    logger.info("querying existing tweet IDs from DB");
   }
-  if (options.maxMinutes) {
-    args.push("--max-minutes", String(options.maxMinutes));
-  }
-  if (options.rebuild) args.push("--rebuild");
-  if (options.continue) args.push("--continue");
-  if (options.gaps) args.push("--gaps");
+  const existingIds = options.rebuild ? new Set<string>() : getExistingIds();
+  logger.info("existing tweet count", { count: existingIds.size });
 
-  logger.info("running ft CLI sync", {
-    maxPages: options.maxPages ?? "none",
-    targetAdds: options.targetAdds ?? "none",
-    maxMinutes: options.maxMinutes ?? "none",
-    rebuild: options.rebuild ?? false,
+  logger.info("initializing GraphQL client");
+  const unchecked = createGraphQL();
+
+  logger.info("checking GraphQL API connectivity");
+  const checked = await unchecked.check({
+    csrfToken,
+    cookieHeader,
   });
 
-  const result = await runFtCommand(args);
-  if (!result.success) {
-    throw new Error(`ft sync failed (exit ${result.code})`);
+  logger.info("fetching bookmarks from X API");
+  const fetched = await checked.fetchBatch(
+    1000, // limit
+    3, // concurrency
+    existingIds, // skip existing
+  );
+
+  logger.info("processing fetched tweets");
+  const tweets = await fetched.processBatch();
+
+  if (tweets.length === 0) {
+    logger.info("no new bookmarks to import");
+    return;
   }
 
-  logger.info("ft CLI sync complete — importing into pipeline DB");
-  const { imported } = importFromFtDb();
+  logger.info("importing into pipeline DB", { count: tweets.length });
+  const { imported } = importIntoTipelineDb(tweets);
   logger.info("import complete", { imported });
 };

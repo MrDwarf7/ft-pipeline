@@ -1,8 +1,9 @@
 // commands/indexes.ts -- Generate category/domain index notes
 
-import { Database } from "jsr:@db/sqlite@^0.13.0";
 import { CONFIG, DOMAINS, TYPES } from "../config.ts";
 import { logger } from "../utils/logger.ts";
+import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
+import type { Database } from "../utils/db.ts";
 
 interface BookmarkEntry {
   tweet_id: string;
@@ -279,7 +280,7 @@ const writeMasterIndex = async (
 export const runIndexes = async (): Promise<void> => {
   logger.info("indexes started");
 
-  const db = new Database(CONFIG.pipelineDbPath);
+  const db = getPipelineDb();
   try {
     const bookmarks = queryBookmarks(db);
     logger.info("bookmarks to index", { count: bookmarks.length });
@@ -299,7 +300,7 @@ export const runIndexes = async (): Promise<void> => {
     await writeEntityPages(byAuthor);
     await writeMasterIndex(bookmarks.length, byCategory, byDomain, byAuthor);
   } finally {
-    db.close();
+    closePipelineDb();
   }
 
   logger.info("indexes complete");

@@ -1,8 +1,9 @@
 // commands/classify.ts -- LLM classification via local Gemma (orchestrator)
 
-import { Database } from "jsr:@db/sqlite@^0.13.0";
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
+import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
+import type { Database } from "../utils/db.ts";
 import { type ConnectedLLM } from "../llm/index.ts";
 import {
   dryRunPreview,
@@ -74,6 +75,7 @@ const classifyRow = async (
   return "classified";
 };
 
+// deno-lint-ignore no-unused-vars
 const processRow = (
   db: Database,
   llm: ConnectedLLM,
@@ -99,7 +101,7 @@ const processBatch = (
     total: totalBatches,
     size: rows.length,
   });
-  return Promise.all(rows.map((row) => processRow(db, llm, row, allResults)));
+  return Promise.all(rows.map((row) => classifyRow(db, llm, row, allResults)));
 };
 
 const summarize = (results: ClassifyResult[]) => {
@@ -119,8 +121,8 @@ export const runClassify = async (
 ): Promise<void> => {
   logger.info("classify started", { model: llm.modelName() ?? "unknown" });
 
-  const db = new Database(CONFIG.pipelineDbPath);
-  db.exec("PRAGMA journal_mode=WAL");
+  const db = getPipelineDb();
+
   try {
     const rows = queryUnclassified(db, options.limit);
     logger.info("found unclassified bookmarks", { count: rows.length });
@@ -163,6 +165,6 @@ export const runClassify = async (
       count: allResults.length,
     });
   } finally {
-    db.close();
+    closePipelineDb();
   }
 };

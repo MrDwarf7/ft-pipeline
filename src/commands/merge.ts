@@ -5,9 +5,9 @@
 // and writes clippings_text (capped at 5000 chars) + clippings_type + timestamp.
 // Priority: articles > posts > media (richest content wins).
 
-import { Database } from "jsr:@db/sqlite@^0.13.0";
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
+import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
 import { extractBody, parseFrontmatter } from "../utils/frontmatter.ts";
 
 interface MergeOptions {
@@ -93,8 +93,8 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
     return;
   }
 
-  const db = new Database(CONFIG.pipelineDbPath);
-  db.exec("PRAGMA journal_mode=WAL");
+  const db = getPipelineDb();
+
   try {
     // Find which tweet_ids exist in the DB
     const dbIds = new Set(
@@ -131,9 +131,9 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
       }
 
       db.exec("COMMIT");
-    } catch (err) {
+    } catch {
       db.exec("ROLLBACK");
-      throw err;
+      closePipelineDb();
     }
 
     logger.info("merge complete", { merged, skipped, total: clippings.size });
@@ -148,6 +148,6 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
       totalEnriched: enrichedCount?.[0]?.cnt ?? 0,
     });
   } finally {
-    db.close();
+    closePipelineDb();
   }
 };

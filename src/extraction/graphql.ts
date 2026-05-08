@@ -1,6 +1,7 @@
 // graphql.ts -- Clean GraphQL client for X bookmarks API
 // Pattern: check() → fetch → process (type-state enforced)
 // Uses Deno std pooledMap for concurrent processing
+// Matches fieldtheory-cli's request format: GET + URLSearchParams
 
 import type { TweetData } from "./types.ts";
 import { pooledMap } from "@std/async/pool";
@@ -14,6 +15,7 @@ import { TweetDataSchema } from "./schema.ts";
 
 // ── Hard-coded constants ──────────────────────────────────
 const BOOKMARKS_QUERY_ID = "Z9GWmP0kP2dajyckAaDUBw";
+const BOOKMARKS_OPERATION = "Bookmarks";
 const X_PUBLIC_BEARER =
   "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA";
 
@@ -42,13 +44,15 @@ const GRAPHQL_FEATURES = {
   responsive_web_media_download_video_enabled: false,
 };
 
-// ── Pure builders ──────────────────────────────────────────
+// ── Pure builders (matches fieldtheory-cli exactly) ────────
 const buildUrl = (cursor: string | undefined, count: number): string => {
-  const variables = JSON.stringify({ count, cursor });
-  const features = JSON.stringify(GRAPHQL_FEATURES);
-  return `https://x.com/i/api/graphql/${BOOKMARKS_QUERY_ID}/Bookmarks?variables=${
-    encodeURIComponent(variables)
-  }&features=${encodeURIComponent(features)}`;
+  const variables: Record<string, unknown> = { count };
+  if (cursor) variables.cursor = cursor;
+  const params = new URLSearchParams({
+    variables: JSON.stringify(variables),
+    features: JSON.stringify(GRAPHQL_FEATURES),
+  });
+  return `https://x.com/i/api/graphql/${BOOKMARKS_QUERY_ID}/${BOOKMARKS_OPERATION}?${params}`;
 };
 
 const buildHeaders = (
@@ -65,20 +69,19 @@ const buildHeaders = (
   cookie: cookieHeader ?? `ct0=${csrfToken}`,
 });
 
-// ── Validation steps (build first, THEN validate) ───────────
+// ── Validation (GET check on base URL) ────────────────────
 const validateConnectivity = async (
   url: string,
   headers: Record<string, string>,
 ): Promise<void> => {
-  const resp = await fetch(url, {
-    method: "HEAD",
-    headers,
-  });
+  // Don't use HEAD — X's GraphQL endpoint rejects it with 405
+  const resp = await fetch(url, { headers });
   if (!resp.ok) throw new Error(`GraphQL API unreachable: ${resp.status}`);
 };
 
 // ── Jitter: random delay between requests ───────────────────
-const jitter = (): Promise<void> => new Promise((r) => setTimeout(r, 500 + Math.random() * 1000));
+const jitter = (): Promise<void> =>
+  new Promise((r) => setTimeout(r, 500 + Math.random() * 1000));
 
 // ── Response parsing (uses zod safeParse) ───────────────────
 const parseTweet = (tweetResult: Record<string, unknown>): TweetData | null => {
@@ -93,7 +96,8 @@ const parseTweet = (tweetResult: Record<string, unknown>): TweetData | null => {
   const authorCore = authorResult.core;
   const authorLegacy = authorResult.legacy;
 
-  const mediaEntities = legacy.extended_entities?.media ?? legacy.entities?.media ?? [];
+  const mediaEntities =
+    legacy.extended_entities?.media ?? legacy.entities?.media ?? [];
   const media = mediaEntities.map((m) => ({
     type: m.type,
     url: m.media_url_https ?? m.media_url ?? "",
@@ -134,12 +138,16 @@ const parseResponse = (
 ): { records: TweetData[]; nextCursor?: string } => {
   const timeline = (json.data as Record<string, unknown>)
     ?.bookmark_timeline_v2 as Record<string, unknown>;
-  const instructions = ((timeline?.timeline as Record<string, unknown>)
-    ?.instructions as Record<string, unknown>[]) ?? [];
+  const instructions =
+    ((timeline?.timeline as Record<string, unknown>)?.instructions as Record<
+      string,
+      unknown
+    >[]) ?? [];
 
   const entries = instructions
     .filter(
-      (inst) => inst.type === "TimelineAddEntries" && Array.isArray(inst.entries),
+      (inst) =>
+        inst.type === "TimelineAddEntries" && Array.isArray(inst.entries),
     )
     .flatMap((inst) => inst.entries as Record<string, unknown>[]);
 
@@ -160,8 +168,8 @@ const parseResponse = (
       ?.itemContent as Record<string, unknown>;
     const tweetResult = ((itemContent?.tweet_results as Record<string, unknown>)
       ?.result ?? itemContent?.tweet_results) as
-        | Record<string, unknown>
-        | undefined;
+      | Record<string, unknown>
+      | undefined;
     if (!tweetResult) return;
     const record = parseTweet(tweetResult);
     if (record) records.push(record);
@@ -170,7 +178,7 @@ const parseResponse = (
   return { records, nextCursor };
 };
 
-// ── Fetch page (single request) ────────────────────────────────
+// ── Fetch page (GET, matches fieldtheory-cli) ────────────────
 const fetchPage = async (
   config: GraphQLConfig,
   cursor: string | undefined,
@@ -181,13 +189,16 @@ const fetchPage = async (
     throw new Error("GraphQL Bookmarks API: all retry attempts failed");
   }
 
-  const response = await fetch(buildUrl(cursor, count), {
-    headers: buildHeaders(config.csrfToken, config.cookieHeader),
-  });
+  const url = buildUrl(cursor, count);
+  const headers = buildHeaders(config.csrfToken, config.cookieHeader);
+
+  const response = await fetch(url, { headers });
 
   if (response.status === 429) {
     const retryAfter = response.headers.get("retry-after");
-    const seconds = retryAfter ? Number(retryAfter) : Math.min(15 * Math.pow(2, attempt), 120);
+    const seconds = retryAfter
+      ? Number(retryAfter)
+      : Math.min(15 * Math.pow(2, attempt), 120);
     await new Promise((r) => setTimeout(r, seconds * 1000));
     return fetchPage(config, cursor, attempt + 1, count);
   }
@@ -213,9 +224,9 @@ const fetchAllPages = async (
   limit: number,
   count: number,
   existingIds: Set<string>,
+  acc: TweetData[][],
+  stalePages: number,
   cursor?: string,
-  acc: TweetData[][] = [],
-  stalePages = 0,
 ): Promise<TweetData[][]> => {
   if (acc.flat().length >= limit) return acc;
   if (stalePages >= 2) return acc; // Stop after 2 stale pages
@@ -244,17 +255,16 @@ const fetchAllPages = async (
     limit,
     count,
     existingIds,
-    nextCursor,
     newAcc,
     newStalePages,
+    nextCursor,
   );
 };
 
 // ── Helper: chunk array ─────────────────────────────────────
 const chunk = <T>(arr: T[], size: number): T[][] =>
-  Array.from(
-    { length: Math.ceil(arr.length / size) },
-    (_, i) => arr.slice(i * size, (i + 1) * size),
+  Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+    arr.slice(i * size, (i + 1) * size),
   );
 
 // ── Public API ────────────────────────────────────────────────
@@ -275,8 +285,11 @@ export const createGraphQL = (): UncheckedSource<GraphQLConfig> => ({
 
     // Capture config in closure, return CheckedSource
     return {
-      fetchBatch: (limit: number, concurrency: number, existingIds: Set<string>) =>
-        fetchBatchImpl(config, limit, concurrency, existingIds),
+      fetchBatch: (
+        limit: number,
+        concurrency: number,
+        existingIds: Set<string>,
+      ) => fetchBatchImpl(config, limit, concurrency, existingIds),
       fetchOne: (id: string) => fetchOneImpl(config, id),
     };
   },
@@ -301,13 +314,11 @@ const fetchBatchImpl = async (
       const batches = chunk(allTweets, 100);
 
       const results: TweetData[] = [];
-      for await (
-        const batch of pooledMap(
-          concurrency,
-          batches,
-          (b: TweetData[]) => Promise.resolve(b), // identity fn (actual processing goes here)
-        )
-      ) {
+      for await (const batch of pooledMap(
+        concurrency,
+        batches,
+        (b: TweetData[]) => Promise.resolve(b), // identity fn (actual processing goes here)
+      )) {
         results.push(...batch);
       }
 

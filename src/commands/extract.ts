@@ -1,8 +1,9 @@
 // commands/extract.ts -- Extract articles via xtracticle + link to DB
 
-import { Database } from "@db/sqlite";
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
+import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
+import type { Database } from "../utils/db.ts";
 
 interface ExtractOptions {
   dryRun?: boolean;
@@ -523,8 +524,8 @@ const summarize = (results: ExtractResult[]) => {
 export const runExtract = async (options: ExtractOptions): Promise<void> => {
   logger.info("extract started");
 
-  const db = new Database(CONFIG.pipelineDbPath);
-  db.exec("PRAGMA journal_mode=WAL");
+  const db = getPipelineDb();
+
   try {
     const rows = queryRows(db, options.limit);
     logger.info("found bookmarks to extract", {
@@ -580,6 +581,6 @@ export const runExtract = async (options: ExtractOptions): Promise<void> => {
       total: rows.length,
     });
   } finally {
-    db.close();
+    closePipelineDb();
   }
 };
