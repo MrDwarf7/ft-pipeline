@@ -47,9 +47,7 @@ const buildUrl = (cursor: string | undefined, count: number): string => {
   const variables = JSON.stringify({ count, cursor });
   const features = JSON.stringify(GRAPHQL_FEATURES);
   return `https://x.com/i/api/graphql/${BOOKMARKS_QUERY_ID}/Bookmarks?variables=${
-    encodeURIComponent(
-      variables,
-    )
+    encodeURIComponent(variables)
   }&features=${encodeURIComponent(features)}`;
 };
 
@@ -78,6 +76,9 @@ const validateConnectivity = async (
   });
   if (!resp.ok) throw new Error(`GraphQL API unreachable: ${resp.status}`);
 };
+
+// ── Jitter: random delay between requests ───────────────────
+const jitter = (): Promise<void> => new Promise((r) => setTimeout(r, 500 + Math.random() * 1000));
 
 // ── Response parsing (uses zod safeParse) ───────────────────
 const parseTweet = (tweetResult: Record<string, unknown>): TweetData | null => {
@@ -133,10 +134,8 @@ const parseResponse = (
 ): { records: TweetData[]; nextCursor?: string } => {
   const timeline = (json.data as Record<string, unknown>)
     ?.bookmark_timeline_v2 as Record<string, unknown>;
-  const instructions = ((timeline?.timeline as Record<string, unknown>)?.instructions as Record<
-    string,
-    unknown
-  >[]) ?? [];
+  const instructions = ((timeline?.timeline as Record<string, unknown>)
+    ?.instructions as Record<string, unknown>[]) ?? [];
 
   const entries = instructions
     .filter(
@@ -208,22 +207,47 @@ const fetchPage = async (
 };
 
 // ── Recursive fetch all pages (avoids no-await-in-loop) ─────
+// Staleness: stops after 2 pages with 0 new tweets
 const fetchAllPages = async (
   config: GraphQLConfig,
   limit: number,
   count: number,
+  existingIds: Set<string>,
   cursor?: string,
   acc: TweetData[][] = [],
+  stalePages = 0,
 ): Promise<TweetData[][]> => {
   if (acc.flat().length >= limit) return acc;
+  if (stalePages >= 2) return acc; // Stop after 2 stale pages
 
   const { records, nextCursor } = await fetchPage(config, cursor, 0, count);
-  const newAcc = [...acc, records];
+
+  // Filter out existing IDs, track new tweets
+  const newRecords = records.filter((r) => !existingIds.has(r.id));
+  const pageIsStale = newRecords.length === 0;
+
+  const newAcc = [...acc, newRecords];
+  const newStalePages = pageIsStale ? stalePages + 1 : 0; // Reset on new tweets
+
+  if (pageIsStale) {
+    if (newStalePages >= 2) return newAcc;
+  }
 
   if (!nextCursor) return newAcc;
 
+  // Jitter between requests
+  await jitter();
+
   // Recursive call (no while loop, no lint error)
-  return fetchAllPages(config, limit, count, nextCursor, newAcc);
+  return fetchAllPages(
+    config,
+    limit,
+    count,
+    existingIds,
+    nextCursor,
+    newAcc,
+    newStalePages,
+  );
 };
 
 // ── Helper: chunk array ─────────────────────────────────────
@@ -251,8 +275,8 @@ export const createGraphQL = (): UncheckedSource<GraphQLConfig> => ({
 
     // Capture config in closure, return CheckedSource
     return {
-      fetchBatch: (limit: number, concurrency: number) =>
-        fetchBatchImpl(config, limit, concurrency),
+      fetchBatch: (limit: number, concurrency: number, existingIds: Set<string>) =>
+        fetchBatchImpl(config, limit, concurrency, existingIds),
       fetchOne: (id: string) => fetchOneImpl(config, id),
     };
   },
@@ -263,9 +287,10 @@ const fetchBatchImpl = async (
   config: GraphQLConfig,
   limit: number,
   concurrency: number,
+  existingIds: Set<string>,
 ): Promise<FetchedBatchSource> => {
-  // Fetch all pages (recursive, no while+await)
-  const pages = await fetchAllPages(config, limit, 200);
+  // Fetch all pages (recursive, no while+await, with jitter + staleness detection)
+  const pages = await fetchAllPages(config, limit, 200, existingIds);
   const allTweets = pages.flat();
 
   return {

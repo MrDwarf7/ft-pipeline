@@ -16,6 +16,7 @@ export interface CheckedSource {
   fetchBatch: (
     limit: number,
     concurrency: number,
+    existingIds: Set<string>,
   ) => Promise<FetchedBatchSource>;
   fetchOne: (id: string) => Promise<FetchedOneSource>;
 }
