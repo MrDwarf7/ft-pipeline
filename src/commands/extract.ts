@@ -1,6 +1,6 @@
 // commands/extract.ts -- Extract articles via xtracticle + link to DB
 
-import { Database } from "jsr:@db/sqlite@^0.13.0";
+import { Database } from "@db/sqlite";
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 
