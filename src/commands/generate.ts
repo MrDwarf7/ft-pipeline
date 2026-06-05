@@ -1,17 +1,271 @@
-// commands/generate.ts -- Regenerate md files from DB via ft CLI
+// commands/generate.ts -- Generate individual bookmark markdown files from pipeline.db
+//
+// Flow:
+//   1. Fetch ALL classified bookmark data from pipeline.db (one query)
+//   2. Sort / organize (no DB, no network)
+//   3. Pass each bookmark through a pure template closure (string interpolation only)
+//   4. Batch-write rendered files to output/bookmarks/
+//
+// The template closure is intentionally stateless — NO DB calls, NO network,
+// NO LLM. All compute happens before the template is called so it stays fast.
 
+import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
-import { runFtCommand } from "../utils/ft-cli.ts";
+import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
+
+// ── Data shape coming out of the DB ──
+
+interface BookmarkData {
+  tweet_id: string;
+  url: string;
+  text: string;
+  display_text: string;
+  author_handle: string;
+  author_name: string;
+  posted_at: string;
+  primary_type: string;
+  primary_domain: string;
+  types: string[];
+  domains: string[];
+  confidence: number | null;
+  content_type: string;
+  media_count: number;
+}
+
+// ── Pure helpers ──
+
+const slugify = (text: string, maxLen = 60): string =>
+  text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, maxLen);
+
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const toDateParts = (iso: string): { yyyy: string; mm: string; dd: string; day: string } => {
+  const d = new Date(iso);
+  const yyyy = String(d.getFullYear());
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return { yyyy, mm, dd, day: DAY_NAMES[d.getDay()] };
+};
+
+const safeJsonArr = (raw: string | null): string[] => {
+  if (!raw) return [];
+  try {
+    const p = JSON.parse(raw);
+    return Array.isArray(p) ? p : [];
+  } catch {
+    return [];
+  }
+};
+
+// ── Template closure (PURE — no I/O, no DB, no network) ──
+// The only thing this does is string templating. Fast, stateless.
+
+type BookmarkTemplate = (data: BookmarkData) => string;
+
+const bookmarkTemplate: BookmarkTemplate = (b) => {
+  const { yyyy, mm, dd, day } = toDateParts(b.posted_at);
+  const dateUnderscore = `${yyyy}_${mm}_${dd}`;
+
+  // Derive a display title from the first line of content
+  // Strip any leading markdown heading markers so we don't get double `#` in the template
+  const firstLine = b.display_text.split("\n")[0]
+    .replace(/^#+\s*/, "")
+    .trim()
+    .slice(0, 120);
+
+  // Build cross-reference lists
+  const typeLinks = b.types.map((t) => `[[categories/${t}]]`);
+  const domainLinks = b.domains.map((d) => `[[domains/${d}]]`);
+
+  return [
+    "---",
+    `tweet_id: "${b.tweet_id}"`,
+    `url: "${b.url}"`,
+    `author: "@${b.author_handle}"`,
+    `author_name: "${b.author_name}"`,
+    `posted_at: "${dateUnderscore}-${day}"`,
+    `type: "${b.primary_type || "unclassified"}"`,
+    `domain: "${b.primary_domain || "uncategorized"}"`,
+    `content_type: "${b.content_type || "unknown"}"`,
+    ...(b.confidence != null ? [`confidence: ${b.confidence}`] : []),
+    ...(b.media_count > 0 ? [`media_count: ${b.media_count}`] : []),
+    "---",
+    "",
+    `# ${firstLine || "@" + b.author_handle}`,
+    "",
+    b.display_text,
+    "",
+    "## Metadata",
+    `- **Author:** [[entities/${b.author_handle}]]`,
+    `- **Category:** [[categories/${b.primary_type || "unclassified"}]]`,
+    `- **Domain:** [[domains/${b.primary_domain || "uncategorized"}]]`,
+    `- **Posted:** ${yyyy}-${mm}-${dd}`,
+    `- **Original:** [View on X](${b.url})`,
+    typeLinks.length > 1
+      ? `- **All types:** ${typeLinks.join(", ")}`
+      : "",
+    domainLinks.length > 1
+      ? `- **All domains:** ${domainLinks.join(", ")}`
+      : "",
+    "",
+    // Related section — cross-links to other things in the same space
+    "## See Also",
+    `- [[categories/${b.primary_type || "unclassified"}]] — more "${b.primary_type}" bookmarks`,
+    `- [[entities/${b.author_handle}]] — more by @${b.author_handle}`,
+    `- [[domains/${b.primary_domain || "uncategorized"}]] — more in "${b.primary_domain}"`,
+    "",
+  ]
+    .filter((l) => l !== "") // remove empty lines from conditional additions
+    .join("\n");
+};
+
+// ── Filename builder ──
+
+const buildFilename = (b: BookmarkData): string => {
+  const { yyyy, mm, dd, day } = toDateParts(b.posted_at);
+  const slug = slugify(b.display_text.slice(0, 80));
+  return `${yyyy}_${mm}_${dd}-${day}-${b.author_handle}-${slug}.md`;
+};
+
+// ── DB fetch — grab everything in one shot ──
+
+const fetchAllBookmarks = (): BookmarkData[] => {
+  const db = getPipelineDb();
+  const rows = db.prepare(`
+    SELECT
+      tweet_id,
+      url,
+      text,
+      author_handle,
+      author_name,
+      posted_at,
+      COALESCE(clippings_text, text) AS display_text,
+      COALESCE(primary_type, 'unclassified') AS primary_type,
+      COALESCE(primary_domain, 'uncategorized') AS primary_domain,
+      types  AS types_raw,
+      domains AS domains_raw,
+      confidence,
+      COALESCE(content_type, 'unknown') AS content_type,
+      media_count
+    FROM bookmarks
+    ORDER BY posted_at DESC
+  `).all<Record<string, unknown>>();
+
+  return rows.map((r) => ({
+    tweet_id: r.tweet_id as string,
+    url: r.url as string,
+    text: r.text as string,
+    display_text: r.display_text as string,
+    author_handle: r.author_handle as string,
+    author_name: r.author_name as string,
+    posted_at: r.posted_at as string,
+    primary_type: r.primary_type as string,
+    primary_domain: r.primary_domain as string,
+    types: safeJsonArr(r.types_raw as string | null),
+    domains: safeJsonArr(r.domains_raw as string | null),
+    confidence: r.confidence as number | null,
+    content_type: r.content_type as string,
+    media_count: r.media_count as number,
+  }));
+};
+
+// ── Batch file writer — writes in concurrency-limited chunks ──
+
+const BATCH_SIZE = 50;
+
+interface FileToWrite {
+  filename: string;
+  content: string;
+}
+
+const writeBatch = async (files: FileToWrite[], dir: string): Promise<number> => {
+  let written = 0;
+  for (let i = 0; i < files.length; i += BATCH_SIZE) {
+    const chunk = files.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      chunk.map((f) => Deno.writeTextFile(`${dir}/${f.filename}`, f.content)),
+    );
+    written += chunk.length;
+  }
+  return written;
+};
+
+// ── Scan existing files on disk ──
+
+const scanExistingFilenames = async (dir: string): Promise<Set<string>> => {
+  try {
+    const entries: string[] = [];
+    for await (const entry of Deno.readDir(dir)) {
+      if (entry.isFile && entry.name.endsWith(".md")) {
+        entries.push(entry.name);
+      }
+    }
+    return new Set(entries);
+  } catch {
+    // Directory doesn't exist yet — nothing to skip
+    return new Set();
+  }
+};
+
+// ── Main ──
 
 export const runGenerate = async (): Promise<void> => {
-  logger.info(
-    "generate started — regenerating all bookmark markdown files via fieldtheory-cli",
-  );
+  logger.info("generate started — reading classified bookmarks from pipeline.db");
 
-  const result = await runFtCommand(["start", "md", "--force"]);
-  if (!result.success) {
-    throw new Error(`ft md failed (exit ${result.code})`);
+  const bookmarks = fetchAllBookmarks();
+  logger.info("fetched bookmarks for rendering", { count: bookmarks.length });
+
+  if (bookmarks.length === 0) {
+    logger.warn("no bookmarks in pipeline.db — nothing to generate");
+    closePipelineDb();
+    return;
   }
 
-  logger.info("generate complete — all bookmark markdown files updated");
+  const outDir = `${CONFIG.mdOutputDir}/bookmarks`;
+  await Deno.mkdir(outDir, { recursive: true });
+
+  // Phase 0: Scan existing files to skip unchanged ones
+  logger.info("scanning existing bookmark files on disk");
+  const existingFiles = await scanExistingFilenames(outDir);
+  logger.info("existing bookmark files on disk", { count: existingFiles.size });
+
+  // Build filenames for all bookmarks and filter to only missing ones
+  const allFiles: FileToWrite[] = bookmarks.map((b) => ({
+    filename: buildFilename(b),
+    content: bookmarkTemplate(b), // template closure — pure, no I/O
+  }));
+
+  const toWrite = allFiles.filter((f) => !existingFiles.has(f.filename));
+  const skipped = allFiles.length - toWrite.length;
+
+  if (skipped > 0) {
+    logger.info("skipped existing files", { skipped, reason: "already on disk" });
+  }
+
+  if (toWrite.length === 0) {
+    logger.info("all bookmark files already up to date — nothing to write");
+    closePipelineDb();
+    return;
+  }
+
+  // Phase 2: Batch-write only the missing files to disk
+  logger.info("writing new rendered files", { count: toWrite.length, batchSize: BATCH_SIZE });
+  const written = await writeBatch(toWrite, outDir);
+
+  closePipelineDb();
+  logger.info("generate complete", { written, total: bookmarks.length });
+
+  // Brief summary so the user knows what happened
+  const types = new Set(bookmarks.map((b) => b.primary_type));
+  const domains = new Set(bookmarks.map((b) => b.primary_domain));
+  logger.info("generate summary", {
+    files_written: written,
+    unique_types: types.size,
+    unique_domains: domains.size,
+    authors: new Set(bookmarks.map((b) => b.author_handle)).size,
+  });
 };

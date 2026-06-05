@@ -1,9 +1,17 @@
-// commands/indexes.ts -- Generate category/domain index notes
+// commands/indexes.ts -- Generate category/domain index notes with hash-based caching
+//
+// Uses SHA-256 hashing to detect content changes before writing.
+// Only updates files when the content hash differs from the on-disk version.
 
-import { CONFIG, DOMAINS, TYPES } from "../config.ts";
+import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
 import type { Database } from "../utils/db.ts";
+import {
+  hashFile,
+  hashContentSync,
+  needsUpdate,
+} from "../utils/hash.ts";
 
 interface BookmarkEntry {
   tweet_id: string;
@@ -102,10 +110,37 @@ const renderPage = (
       .join("\n\n")
   }`;
 
-// -- Page writers --
+// -- Output path utilities --
+
+const getCategoryOutputPath = (category: string) => {
+  const dir = `${CONFIG.mdOutputDir}/categories`;
+  return `${dir}/${category}.md`;
+};
+
+const getDomainOutputPath = (domain: string) => {
+  const dir = `${CONFIG.mdOutputDir}/domains`;
+  return `${dir}/${domain}.md`;
+};
+
+const getEntityOutputPath = (handle: string) => {
+  const dir = `${CONFIG.mdOutputDir}/entities`;
+  return `${dir}/${handle}.md`;
+};
+
+const getMasterIndexPath = () => {
+  return `${CONFIG.mdOutputDir}/index.md`;
+};
+
+// -- Page writers with hash-based caching --
+
+interface WriteOptions {
+  existingPath: string | null;
+  baseDir: string;
+}
 
 const writeCategoryPages = async (
   byCategory: Record<string, BookmarkEntry[]>,
+  options?: WriteOptions,
 ): Promise<void> => {
   const dir = `${CONFIG.mdOutputDir}/categories`;
   await Deno.mkdir(dir, { recursive: true });
@@ -143,17 +178,38 @@ const writeCategoryPages = async (
         ],
       );
 
-      await Deno.writeTextFile(`${dir}/${category}.md`, content);
-      logger.info("category index written", {
-        category,
-        count: entries.length,
-      });
+      const outputPath = getCategoryOutputPath(category);
+      const existingPath = options?.existingPath
+        ? existingPath
+        : outputPath;
+
+      const needsUpdate = await needsUpdate(
+        existingPath,
+        dir,
+        content,
+      );
+
+      if (needsUpdate) {
+        await Deno.writeTextFile(outputPath, content);
+        logger.info("category index updated", {
+          category,
+          count: entries.length,
+          path: outputPath,
+        });
+      } else {
+        logger.debug("category index unchanged (hash match)", {
+          category,
+          count: entries.length,
+          path: outputPath,
+        });
+      }
     }),
   );
 };
 
 const writeDomainPages = async (
   byDomain: Record<string, BookmarkEntry[]>,
+  options?: WriteOptions,
 ): Promise<void> => {
   const dir = `${CONFIG.mdOutputDir}/domains`;
   await Deno.mkdir(dir, { recursive: true });
@@ -188,8 +244,31 @@ const writeDomainPages = async (
         ],
       );
 
-      await Deno.writeTextFile(`${dir}/${domain}.md`, content);
-      logger.info("domain index written", { domain, count: entries.length });
+      const outputPath = getDomainOutputPath(domain);
+      const existingPath = options?.existingPath
+        ? existingPath
+        : outputPath;
+
+      const needsUpdate = await needsUpdate(
+        existingPath,
+        dir,
+        content,
+      );
+
+      if (needsUpdate) {
+        await Deno.writeTextFile(outputPath, content);
+        logger.info("domain index updated", {
+          domain,
+          count: entries.length,
+          path: outputPath,
+        });
+      } else {
+        logger.debug("domain index unchanged (hash match)", {
+          domain,
+          count: entries.length,
+          path: outputPath,
+        });
+      }
     }),
   );
 };
@@ -198,6 +277,7 @@ const ENTITY_THRESHOLD = 5;
 
 const writeEntityPages = async (
   byAuthor: Record<string, BookmarkEntry[]>,
+  options?: WriteOptions,
 ): Promise<void> => {
   const dir = `${CONFIG.mdOutputDir}/entities`;
   await Deno.mkdir(dir, { recursive: true });
@@ -236,8 +316,31 @@ const writeEntityPages = async (
         ],
       );
 
-      await Deno.writeTextFile(`${dir}/${handle}.md`, content);
-      logger.info("entity page written", { handle, count: entries.length });
+      const outputPath = getEntityOutputPath(handle);
+      const existingPath = options?.existingPath
+        ? existingPath
+        : outputPath;
+
+      const needsUpdate = await needsUpdate(
+        existingPath,
+        dir,
+        content,
+      );
+
+      if (needsUpdate) {
+        await Deno.writeTextFile(outputPath, content);
+        logger.info("entity page updated", {
+          handle,
+          count: entries.length,
+          path: outputPath,
+        });
+      } else {
+        logger.debug("entity page unchanged (hash match)", {
+          handle,
+          count: entries.length,
+          path: outputPath,
+        });
+      }
     }),
   );
 };
@@ -247,6 +350,7 @@ const writeMasterIndex = async (
   byCategory: Record<string, BookmarkEntry[]>,
   byDomain: Record<string, BookmarkEntry[]>,
   byAuthor: Record<string, BookmarkEntry[]>,
+  options?: WriteOptions,
 ): Promise<void> => {
   const topEntities = Object.entries(byAuthor)
     .filter(([_, entries]) => entries.length >= ENTITY_THRESHOLD)
@@ -271,8 +375,23 @@ const writeMasterIndex = async (
       .join("\n")
   }\n`;
 
-  await Deno.writeTextFile(`${CONFIG.mdOutputDir}/index.md`, content);
-  logger.info("master index written");
+  const outputPath = getMasterIndexPath();
+  const existingPath = options?.existingPath
+    ? existingPath
+    : outputPath;
+
+  const needsUpdate = await needsUpdate(
+    existingPath,
+    CONFIG.mdOutputDir,
+    content,
+  );
+
+  if (needsUpdate) {
+    await Deno.writeTextFile(outputPath, content);
+    logger.info("master index updated", { path: outputPath });
+  } else {
+    logger.debug("master index unchanged (hash match)", { path: outputPath });
+  }
 };
 
 // -- Main --
@@ -295,6 +414,7 @@ export const runIndexes = async (): Promise<void> => {
     );
     const byAuthor = groupBy(bookmarks, (b) => b.author_handle);
 
+    // Write all pages with hash-based caching
     await writeCategoryPages(byCategory);
     await writeDomainPages(byDomain);
     await writeEntityPages(byAuthor);

@@ -1,7 +1,7 @@
 // pipeline.ts -- Pipeline composition and full run orchestration
 //
-// Key change: we READ from ft's bookmarks.db but WRITE to our own pipeline.db.
-// Migrate creates our schema. Sync copies from ft DB into ours.
+// Key change: we OWN pipeline.db. Sync reads from X directly, writes into
+// our DB. Extract/Merge/Classify/Generate all read from pipeline.db.
 
 import { Args, getPassword } from "../types.ts";
 import { runMigrate } from "../commands/migrate.ts";

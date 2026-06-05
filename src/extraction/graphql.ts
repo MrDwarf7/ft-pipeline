@@ -76,6 +76,27 @@ const validateConnectivity = async (
 ): Promise<void> => {
   // Don't use HEAD — X's GraphQL endpoint rejects it with 405
   const resp = await fetch(url, { headers });
+
+  // Check for stale-auth response (200 with errors but no data)
+  if (resp.ok) {
+    const text = await resp.text().catch(() => "");
+    try {
+      const parsed = JSON.parse(text);
+      const hasErrors = Array.isArray(parsed.errors) && parsed.errors.length > 0;
+      const hasNoData = !parsed.data;
+      if (hasErrors && hasNoData) {
+        const messages = parsed.errors.map((e: Record<string, unknown>) => e.message).join("; ");
+        throw new Error(`GraphQL API auth error: ${messages}`);
+      }
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        // Not JSON — body might be HTML error page, just check status
+      } else {
+        throw err; // rethrow our parsed auth error
+      }
+    }
+  }
+
   if (!resp.ok) throw new Error(`GraphQL API unreachable: ${resp.status}`);
 };
 
@@ -135,8 +156,28 @@ const parseResponse = (
   json: Record<string, unknown>,
 ): { records: TweetData[]; nextCursor?: string } => {
   // Match fieldtheory-cli exactly: json.data.bookmark_timeline_v2.timeline.instructions
-  const data = json.data as Record<string, unknown>;
-  const bookmarkTimeline = data?.bookmark_timeline_v2 as Record<string, unknown>;
+  const data = json.data as Record<string, unknown> | undefined;
+
+  // Diagnostic: check expected structure and log if something's off
+  if (!data) {
+    const hasErrors = Array.isArray(json.errors) && (json.errors as unknown[]).length > 0;
+    if (hasErrors) {
+      const msgs = (json.errors as unknown[])
+        .map((e: unknown) => (e as Record<string, unknown>).message)
+        .join("; ");
+      throw new Error(`X API returned errors: ${msgs}`);
+    }
+    throw new Error(
+      `X API response missing .data — unexpected structure. Keys: ${Object.keys(json).join(", ")}`,
+    );
+  }
+
+  const bookmarkTimeline = data?.bookmark_timeline_v2 as Record<string, unknown> | undefined;
+  if (!bookmarkTimeline) {
+    throw new Error(
+      `X API response missing .data.bookmark_timeline_v2 — keys: ${Object.keys(data).join(", ")}`,
+    );
+  }
   const timeline = bookmarkTimeline?.timeline as Record<string, unknown>;
   const instructions = (timeline?.instructions as unknown[]) ?? [];
 
@@ -178,7 +219,16 @@ const parseResponse = (
 
     if (!tweetResult) continue;
 
-    const record = parseTweet(tweetResult as Record<string, unknown>);
+    // Handle BOTH tweet result formats from X API:
+    //   Old: { __typename:"Tweet", limitedActionResults, tweet: { legacy, core, ... } }
+    //   New (current): { __typename:"Tweet", legacy, core, note_tweet, ... } — flat format
+    // The Zod schema expects { tweet: { legacy, core, ... } }, so for the flat format
+    // we wrap it to match. This way parseTweet works unchanged.
+    const tweetData = (tweetResult as Record<string, unknown>).tweet
+      ? tweetResult  // old format: already has tweet wrapper
+      : { tweet: tweetResult }; // flat format: wrap it
+
+    const record = parseTweet(tweetData as Record<string, unknown>);
     if (record) records.push(record);
   }
 
@@ -238,9 +288,20 @@ const fetchAllPages = async (
 
   const { records, nextCursor } = await fetchPage(config, cursor, 0, count);
 
-  // Filter out existing IDs, track new tweets
+  // Diagnostic: log what the API is actually returning
+  const existingInPage = records.filter((r) => existingIds.has(r.id)).length;
   const newRecords = records.filter((r) => !existingIds.has(r.id));
   const pageIsStale = newRecords.length === 0;
+
+  if (records.length === 0) {
+    console.error(`[sync] page returned 0 records (cursor: ${cursor ? cursor.slice(0, 20) + "..." : "initial"})`);
+  } else if (existingInPage === records.length) {
+    console.error(`[sync] page: ${records.length} records, ALL ${existingInPage} already in DB — likely caught up`);
+  } else if (existingInPage > 0) {
+    console.error(`[sync] page: ${records.length} records (${existingInPage} existing, ${newRecords.length} new)`);
+  } else {
+    console.error(`[sync] page: ${records.length} records, all new`);
+  }
 
   const newAcc = [...acc, newRecords];
   const newStalePages = pageIsStale ? stalePages + 1 : 0; // Reset on new tweets

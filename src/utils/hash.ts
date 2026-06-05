@@ -1,0 +1,156 @@
+// utils/hash.ts -- SHA-256 hashing utilities for content comparison
+//
+// Provides functions to compute file hashes and content hashes for
+// comparison before writing index files. Uses Web Crypto API for
+// efficient in-memory hashing.
+
+import { CONFIG } from "../config.ts";
+
+// ── Constants ─────────────────────────────────────────────────
+// Use a reasonable chunk size for large file reading
+const CHUNK_SIZE = 65536; // 64KB chunks for file reading
+
+// ── Type definitions ──────────────────────────────────────────
+type HashResult = {
+  hash: string;
+  size: number;
+};
+
+// ── File hashing ──────────────────────────────────────────────
+
+/**
+ * Compute SHA-256 hash of a file by reading it in chunks.
+ *
+ * Reads the file in 64KB chunks and accumulates the hash digest.
+ * This is memory-efficient for large files.
+ *
+ * @param path - Absolute or relative path to the file
+ * @param baseDir - Base directory to resolve relative paths against
+ * @returns Promise resolving to hash string and file size
+ */
+export const hashFile = async (
+  path: string,
+  baseDir: string,
+): Promise<HashResult> => {
+  const fullPath = path.startsWith("/") ? path : `${baseDir}/${path}`;
+  const file = await Deno.open(fullPath, { read: true });
+
+  try {
+    const crypto = window.crypto || crypto;
+    const encoder = new TextEncoder();
+
+    // Initialize hash
+    const hash = await crypto.subtle.digest("SHA-256", encoder.encode(""));
+
+    // Read file in chunks and update hash
+    let chunk: Uint8Array | null;
+    while ((chunk = await file.read(CHUNK_SIZE)) !== null) {
+      await crypto.subtle.digest(
+        "SHA-256",
+        await crypto.subtle.importKey(
+          "raw",
+          chunk,
+          "SHA-256",
+          false,
+          ["digest"],
+        ),
+      );
+    }
+
+    // Finalize
+    const finalHash = await crypto.subtle.digest("SHA-256", new Uint8Array(0));
+
+    return {
+      hash: Array.from(finalHash)
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join(""),
+      size: file.statSync()?.size ?? 0,
+    };
+  } finally {
+    file.close();
+  }
+};
+
+/**
+ * Compute SHA-256 hash of a string (content).
+ *
+ * @param content - String content to hash
+ * @returns Promise resolving to hash string
+ */
+export const hashContent = async (
+  content: string,
+): Promise<string> => {
+  const crypto = window.crypto || crypto;
+  const encoder = new TextEncoder();
+
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    encoder.encode(content),
+  );
+
+  return Array.from(hash)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
+/**
+ * Compute SHA-256 hash of a string (content) synchronously.
+ *
+ * @param content - String content to hash
+ * @returns Hash string
+ */
+export const hashContentSync = (
+  content: string,
+): string => {
+  const crypto = window.crypto || crypto;
+  const encoder = new TextEncoder();
+
+  const hash = crypto.subtle.digest("SHA-256", encoder.encode(content));
+
+  return Array.from(hash)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
+// ── Comparison utilities ──────────────────────────────────────
+
+/**
+ * Check if two hashes are equal.
+ *
+ * @param hash1 - First hash string
+ * @param hash2 - Second hash string
+ * @returns True if hashes match
+ */
+export const hashesMatch = (hash1: string, hash2: string): boolean => {
+  return hash1.toLowerCase() === hash2.toLowerCase();
+};
+
+/**
+ * Check if a file needs to be updated by comparing hashes.
+ *
+ * @param existingPath - Path to existing file on disk
+ * @param baseDir - Base directory for resolving paths
+ * @param newContent - New content to compare against
+ * @returns Promise resolving to true if update needed
+ */
+export const needsUpdate = async (
+  existingPath: string | null,
+  baseDir: string,
+  newContent: string,
+): Promise<boolean> => {
+  // If no existing file, always update
+  if (!existingPath) {
+    return true;
+  }
+
+  try {
+    const existingHash = await hashFile(existingPath, baseDir);
+    const newHash = await hashContent(newContent);
+
+    return !hashesMatch(existingHash.hash, newHash);
+  } catch (error) {
+    // If file doesn't exist or other error, assume update needed
+    console.error(`Error checking update for ${existingPath}:`, error);
+    return true;
+  }
+};

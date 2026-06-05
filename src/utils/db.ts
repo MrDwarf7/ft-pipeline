@@ -113,7 +113,6 @@ class Sqlite3Database implements Database {
 
   constructor(dbPath: string) {
     this.dbPath = dbPath;
-    logger.info("opened pipeline DB via sqlite3 CLI", { db: dbPath });
   }
 
   exec(sql: string): void {

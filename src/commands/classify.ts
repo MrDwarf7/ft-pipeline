@@ -155,7 +155,7 @@ export const runClassify = async (
       confidence_threshold: CONFIDENCE_THRESHOLD,
       results: allResults,
     };
-    const resultsPath = `${Deno.env.get("HOME")}/.ft-bookmarks/classification-results.json`;
+    const resultsPath = CONFIG.classificationResultsPath;
     await Deno.writeTextFile(
       resultsPath,
       JSON.stringify(resultsOutput, null, 2),

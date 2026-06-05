@@ -1,35 +1,95 @@
-// utils/logger.ts -- @std/log with rotating file handler
-import { ConsoleHandler, getLogger, type LogRecord, RotatingFileHandler, setup } from "@std/log";
+// utils/logger.ts -- Centralised structured JSON logger
+// Writes to stdout (with ANSI colors) AND to a time-rotated file
+// at CONFIG.logDir (currently /home/dwarf/.config/ft-pipeline/logs/)
+// Filename format: pipeline-YYYY-MM-DD_HH-MM-SS.log
 
-const LOG_DIR = `${Deno.env.get("HOME")}/.ft-bookmarks/logs`;
-await Deno.mkdir(LOG_DIR, { recursive: true });
+import { CONFIG } from "../config.ts";
 
-const LOG_PATH = `${LOG_DIR}/pipeline.log`;
+const LOG_DIR = CONFIG.logDir;
 
-const fmt = (r: LogRecord, timestamp = false): string => {
-  const prefix = timestamp ? `${r.datetime.toISOString()} [${r.levelName}] ` : "";
-  const ctx = r.args?.[0] && typeof r.args[0] === "object" ? ` ${JSON.stringify(r.args[0])}` : "";
-  return `${prefix}${r.msg}${ctx}`;
+const encoder = new TextEncoder();
+
+export type LogLevel = "info" | "warn" | "error" | "debug";
+export type LogData =
+  | Record<string, unknown>
+  | string
+  | number
+  | boolean
+  | null
+  | undefined;
+
+const formatData = (data: LogData): string => {
+  if (data === undefined || data === null) return "";
+  if (typeof data === "string") return ` ${data}`;
+  if (typeof data === "number" || typeof data === "boolean") return ` ${data}`;
+  return ` ${JSON.stringify(data)}`;
 };
 
-setup({
-  handlers: {
-    file: new RotatingFileHandler("INFO", {
-      filename: LOG_PATH,
-      maxBytes: 10 * 1024 * 1024, // 10MB
-      maxBackupCount: 3,
-      formatter: (r) => fmt(r, true),
-    }),
-    console: new ConsoleHandler("INFO", {
-      formatter: (r) => fmt(r),
-    }),
-  },
-  loggers: {
-    default: {
-      level: "INFO",
-      handlers: ["file", "console"],
-    },
-  },
-});
+const COLORS: Record<LogLevel, string> = {
+  info: "\x1b[32m", // green
+  warn: "\x1b[33m", // yellow
+  error: "\x1b[31m", // red
+  debug: "\x1b[90m", // bright black / gray
+};
+const RESET = "\x1b[0m";
 
-export const logger = getLogger();
+const log = (level: LogLevel, message: string, data?: LogData): void => {
+  const ts = new Date().toISOString();
+  const color = COLORS[level];
+  const dataStr = formatData(data);
+  const colored = `${ts} ${color}[${level.toUpperCase()}]${RESET} ${message}${dataStr}\n`;
+  Deno.stdout.writeSync(encoder.encode(colored));
+
+  // Also write to daily-rotated log file (without ANSI codes)
+  const plain = `${ts} [${level.toUpperCase()}] ${message}${dataStr}`;
+  logToFile(plain);
+};
+
+export const logger = {
+  info: (message: string, data?: LogData) => log("info", message, data),
+  warn: (message: string, data?: LogData) => log("warn", message, data),
+  error: (message: string, data?: LogData) => log("error", message, data),
+  debug: (message: string, data?: LogData) => log("debug", message, data),
+};
+
+// ── File-backed log ─────────────────────────────────────────────────
+// Writes a copy of structured logs to a time-rotated file in the
+// pipeline log directory (format: pipeline-YYYY-MM-DD_HH-MM-SS.log).
+
+let logStream: Deno.FsFile | null = null;
+let logDate = "";
+let logTime = "";
+
+const getLogFile = (): Deno.FsFile => {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toISOString().slice(11, 19); // HH:MM:SS
+  const filename = `pipeline-${date}_${time}.log`;
+
+  if (logStream && logDate === date && logTime === time) {
+    return logStream;
+  }
+
+  logStream?.close();
+
+  try {
+    Deno.mkdirSync(LOG_DIR, { recursive: true });
+  } catch {
+    // ignore if dir already exists
+  }
+
+  const path = `${LOG_DIR}/${filename}`;
+  logStream = Deno.openSync(path, { write: true, create: true, append: true });
+  logDate = date;
+  logTime = time;
+  return logStream;
+};
+
+export const logToFile = (line: string): void => {
+  try {
+    const file = getLogFile();
+    file.writeSync(encoder.encode(line + "\n"));
+  } catch {
+    // silently fail — we don't want logging errors to crash the pipeline
+  }
+};
