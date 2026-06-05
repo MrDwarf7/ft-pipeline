@@ -120,7 +120,7 @@ export const runSync = async (
   const tweets = await fetched.processBatch();
 
   if (tweets.length === 0) {
-    logger.info("no new bookmarks to import");
+    logger.info("no new bookmarks to import — all caught up");
     return;
   }
 

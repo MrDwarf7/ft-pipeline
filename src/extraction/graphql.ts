@@ -305,21 +305,21 @@ const fetchAllPages = async (
   const pageIsStale = newRecords.length === 0;
 
   if (records.length === 0) {
-    logger.error(
+    logger.info(
       `[sync] page returned 0 records (cursor: ${
         cursor ? cursor.slice(0, 20) + "..." : "initial"
       })`,
     );
   } else if (existingInPage === records.length) {
-    logger.error(
-      `[sync] page: ${records.length} records, ALL ${existingInPage} already in DB — likely caught up`,
+    logger.info(
+      `[sync] page: ${records.length} records, all already in DB — caught up`,
     );
   } else if (existingInPage > 0) {
-    logger.error(
+    logger.info(
       `[sync] page: ${records.length} records (${existingInPage} existing, ${newRecords.length} new)`,
     );
   } else {
-    logger.error(`[sync] page: ${records.length} records, all new`);
+    logger.info(`[sync] page: ${records.length} records, all new`);
   }
 
   const newAcc = [...acc, newRecords];

@@ -10,8 +10,6 @@
 
 // ── File hashing ──────────────────────────────────────────────
 
-import { logger } from "./logger.ts";
-
 /**
  * Compute SHA-256 hash of a file by reading it in chunks.
  *
@@ -32,45 +30,31 @@ export const hashFile = async (
   try {
     const crypto = globalThis.crypto;
 
-    // Read entire file into ArrayBuffer using functional iterator
     const stat = file.statSync();
     const size = stat?.size ?? 0;
 
     if (size > 0) {
       const buffer = new Uint8Array(size);
+      const CHUNK_SIZE = 65536;
 
-      // TODO: wtf is this magicical number? (65536) ?? What is it? Document it by putting it into a proper constant.
-      // Surely Deno has a proper function for this in it's std lib?
-
-      // Read file in chunks using Array.from() with index
-      Array.from({ length: Math.ceil(size / 65536) }, async (_, i) => {
-        const offset = i * 65536;
-        const chunkSize = Math.min(65536, size - offset);
-        try {
-          const bytesRead = await file.read(
-            buffer.slice(offset, offset + chunkSize),
-          );
-          if (bytesRead === null) return 0;
-          return bytesRead;
-        } catch (err) {
-          logger.error("error reading file chunk for hashing", {
-            path: fullPath,
-            error: String(err),
-          });
-        }
-      });
+      // Read file in chunks — collect promises, then await all
+      const readPromises: Promise<number | null>[] = [];
+      const chunks = Math.ceil(size / CHUNK_SIZE);
+      for (let i = 0; i < chunks; i++) {
+        const offset = i * CHUNK_SIZE;
+        const chunkSize = Math.min(CHUNK_SIZE, size - offset);
+        readPromises.push(
+          file.read(buffer.slice(offset, offset + chunkSize)),
+        );
+      }
+      await Promise.all(readPromises);
 
       // Hash the buffer
       const hash = await crypto.subtle.digest("SHA-256", buffer);
 
-      // Convert hash to hex string using functional iterator
-      const bytes = hash as ArrayBuffer;
-      const view = new DataView(bytes);
-      const hex = Array.from(
-        { length: view.byteLength },
-        () => view.getUint8(0).toString(16).padStart(2, "0"),
-      );
-      return hex.join("");
+      // Convert hash to hex string
+      const hashArray = new Uint8Array(hash);
+      return Array.from(hashArray, (b) => b.toString(16).padStart(2, "0")).join("");
     }
 
     return "";
@@ -92,15 +76,8 @@ export const hashContent = async (content: string): Promise<string> => {
   const encoder = new TextEncoder();
 
   const hash = await crypto.subtle.digest("SHA-256", encoder.encode(content));
-
-  // Convert hash to hex string using functional iterator
-  const bytes = hash as ArrayBuffer;
-  const view = new DataView(bytes);
-  const hex = Array.from(
-    { length: view.byteLength },
-    () => view.getUint8(0).toString(16).padStart(2, "0"),
-  );
-  return hex.join("");
+  const hashArray = new Uint8Array(hash);
+  return Array.from(hashArray, (b) => b.toString(16).padStart(2, "0")).join("");
 };
 
 /**
@@ -113,16 +90,9 @@ export const hashContentSync = async (content: string): Promise<string> => {
   const crypto = globalThis.crypto;
   const encoder = new TextEncoder();
 
-  const hash = crypto.subtle.digest("SHA-256", encoder.encode(content));
-
-  // Convert hash to hex string using functional iterator
-  const bytes = (await hash) as ArrayBuffer;
-  const view = new DataView(bytes);
-  const hex = Array.from(
-    { length: view.byteLength },
-    () => view.getUint8(0).toString(16).padStart(2, "0"),
-  );
-  return hex.join("");
+  const hash = await crypto.subtle.digest("SHA-256", encoder.encode(content));
+  const hashArray = new Uint8Array(hash);
+  return Array.from(hashArray, (b) => b.toString(16).padStart(2, "0")).join("");
 };
 
 // ── Comparison utilities ──────────────────────────────────────
