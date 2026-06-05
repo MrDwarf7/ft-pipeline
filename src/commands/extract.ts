@@ -64,22 +64,15 @@ const normalizeMedia = (
   return [];
 };
 
-/** Build rev-iso filename: YYYY_MM_DD-Dow-@handle-slug-title.md */
-const buildFilename = (tweet: XtracticleResponse["tweets"][0]): string => {
-  const dateInfo = parseDate(tweet.created_at);
-  const handle = `@${tweet.author.screen_name}`;
-  const titleSlug = slug(tweet.text.slice(0, 50)) || tweet.id;
-
-  if (dateInfo) {
-    return `${dateInfo.year}_${dateInfo.month}_${dateInfo.day}-${dateInfo.dow}-${handle}-${titleSlug}.md`;
-  }
-  return `undated-${handle}-${titleSlug}.md`;
-};
+type DateInfo = {
+  year: string;
+  month: string;
+  day: string;
+  dow: string;
+} | null;
 
 /** Parse Twitter date string (e.g. "Fri Aug 28 11:05:56 +0000 2020") or ISO date */
-const parseDate = (
-  dateStr: string,
-): { year: string; month: string; day: string; dow: string } | null => {
+const parseDate = (dateStr: string): DateInfo => {
   if (!dateStr) return null;
 
   // ISO format: "2024-07-17" or "2024-07-17T..."
@@ -117,6 +110,18 @@ const parseDate = (
   }
 
   return null;
+};
+
+/** Build rev-iso filename: YYYY_MM_DD-Dow-@handle-slug-title.md */
+const buildFilename = (tweet: XtracticleResponse["tweets"][0]): string => {
+  const dateInfo = parseDate(tweet.created_at);
+  const handle = `@${tweet.author.screen_name}`;
+  const titleSlug = slug(tweet.text.slice(0, 50)) || tweet.id;
+
+  if (dateInfo) {
+    return `${dateInfo.year}_${dateInfo.month}_${dateInfo.day}-${dateInfo.dow}-${handle}-${titleSlug}.md`;
+  }
+  return `undated-${handle}-${titleSlug}.md`;
 };
 
 /** Slugify a string for filenames */
@@ -521,7 +526,7 @@ const summarize = (results: ExtractResult[]) => {
   };
 };
 
-export const runExtract = async (options: ExtractOptions): Promise<void> => {
+export const runExtract = (options: ExtractOptions): void => {
   logger.info("extract started");
 
   const db = getPipelineDb();
@@ -534,7 +539,7 @@ export const runExtract = async (options: ExtractOptions): Promise<void> => {
       skipExisting: options.skipExisting ?? false,
     });
 
-    if (options.dryRun) return dryRunPreview(rows);
+    if (options.dryRun) dryRunPreview(rows);
 
     // TODO: We can probably combine the batches themselves into the reduce operation.
     // Also means we shouldn't have to rely on the `allResults` array either.
@@ -555,13 +560,14 @@ export const runExtract = async (options: ExtractOptions): Promise<void> => {
       return batch;
     });
 
-    // Flush batches sequentially via reduce chain
-    await batches.reduce(
+    // Flatten into a single sequential Promise chain
+    batches.reduce(
       (chain, batch, i) =>
         chain.then(async () => {
           logger.info("extract batch processing", {
             batch: i + 1,
             total: batches.length,
+            size: batch.length,
           });
           const results = await processBatch(
             db,

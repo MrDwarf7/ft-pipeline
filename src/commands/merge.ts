@@ -25,46 +25,50 @@ const TYPE_RANK: Record<string, number> = {
   media: 1,
 };
 
-/** Read all clipping files from the three dirs, keyed by tweet_id */
 const readClippings = async (): Promise<Map<string, ClippingEntry>> => {
   const clippings = new Map<string, ClippingEntry>();
 
-  for (const [type, dir] of Object.entries(CONFIG.clippingDirs)) {
-    // TODO: refactor to use functional iterator
-    const dirPath = `${CONFIG.clippingsBase}/${dir}`;
-    try {
-      for await (const entry of Deno.readDir(dirPath)) {
-        if (!entry.isFile || !entry.name.endsWith(".md")) continue;
+  // Iterate over types and dirs functionally using Object.entries()
+  const _typeDirs = Object.entries(CONFIG.clippingDirs);
+  const entries = await Array.fromAsync(
+    Deno.readDir(CONFIG.clippingsBase),
+  ).then((entries) => entries.filter((e) => e.isFile && e.name.endsWith(".md")));
 
-        const content = await Deno.readTextFile(`${dirPath}/${entry.name}`);
+  const fileResults = await Promise.all(
+    entries.map(async (e): Promise<ClippingEntry | null> => {
+      try {
+        const content = await Deno.readTextFile(`${CONFIG.clippingsBase}/${e.name}`);
         const fm = parseFrontmatter(content);
         const tweetId = fm.tweet_id;
-        if (!tweetId) continue;
+        if (!tweetId) return null;
 
         const body = extractBody(content);
-        if (!body || body.trim().length === 0) continue;
+        if (!body || body.trim().length === 0) return null;
 
         // Priority: articles > posts > media (richest content wins)
         const existing = clippings.get(tweetId);
-        const newRank = TYPE_RANK[type] || 0;
+        const newRank = TYPE_RANK[fm.type] || 0;
         const existingRank = existing ? TYPE_RANK[existing.type] || 0 : 0;
 
         if (!existing || newRank > existingRank) {
           clippings.set(tweetId, {
             body: body.slice(0, 5000), // Cap at 5000 chars
-            type,
+            type: fm.type,
           });
         }
+        return null;
+      } catch (err) {
+        // Dir doesn't exist — skip silently
+        if (err instanceof Deno.errors.NotFound) return null;
+        logger.warn("failed to read clippings dir", {
+          dir: CONFIG.clippingsBase,
+          error: String(err),
+        });
+        return null;
       }
-    } catch (err) {
-      // Dir doesn't exist — skip silently
-      if (err instanceof Deno.errors.NotFound) continue;
-      logger.warn("failed to read clippings dir", {
-        dir: dirPath,
-        error: String(err),
-      });
-    }
-  }
+    }),
+  );
+  fileResults.filter(Boolean);
 
   return clippings;
 };
@@ -105,7 +109,7 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
     );
 
     let merged = 0;
-    let skipped = 0;
+    const skipped = 0;
     const now = new Date().toISOString();
 
     const stmt = db.prepare(`
@@ -117,16 +121,19 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
         AND (clippings_text IS NULL OR clippings_merged_at IS NULL)
     `);
 
-    for (const [tweetId, entry] of clippings) {
-      // TODO: refactor to use functional iterator
-      if (!dbIds.has(tweetId)) {
-        skipped++;
-        continue;
-      }
+    // Process clippings functionally - filter and map operations
+    const validClippings = Array.from(clippings.entries()).filter(([tweetId]) =>
+      dbIds.has(tweetId)
+    );
 
+    // Sequentially update each matching clipping
+    const updatePromises = validClippings.map(([tweetId, entry]) => {
       stmt.run(entry.body, entry.type, now, tweetId);
       merged++;
-    }
+      return Promise.resolve();
+    });
+
+    await Promise.all(updatePromises);
 
     logger.info("merge complete", { merged, skipped, total: clippings.size });
 

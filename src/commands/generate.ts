@@ -187,26 +187,27 @@ const writeBatch = async (
   files: FileToWrite[],
   dir: string,
 ): Promise<number> => {
-  const writes: Promise<unknown>[] = [];
-  for (let i = 0; i < files.length; i += BATCH_SIZE) {
-    // TODO: refactor to use functional iterator
-    const chunk = files.slice(i, i + BATCH_SIZE);
-    const chunkWrites = chunk.map((f) => Deno.writeTextFile(`${dir}/${f.filename}`, f.content));
-    writes.push(...chunkWrites);
-  }
-  await Promise.all(writes);
+  // Split into chunks and flatten all writes functionally
+  const chunks = Array.from(
+    { length: Math.ceil(files.length / BATCH_SIZE) },
+    (_, i) => {
+      const start = i * BATCH_SIZE;
+      const end = Math.min(start + BATCH_SIZE, files.length);
+      const chunk = files.slice(start, end);
+      const writes = chunk.map((f) => Deno.writeTextFile(`${dir}/${f.filename}`, f.content));
+      return writes;
+    },
+  );
+  await Promise.all(chunks.flat());
   return files.length;
 };
 
 const scanExistingFilenames = async (dir: string): Promise<Set<string>> => {
   try {
-    const entries: string[] = [];
-    for await (const entry of Deno.readDir(dir)) {
-      if (entry.isFile && entry.name.endsWith(".md")) {
-        entries.push(entry.name);
-      }
-    }
-    return new Set(entries);
+    const entries = await Array.fromAsync(Deno.readDir(dir)).then((entries) =>
+      entries.filter((e) => e.isFile && e.name.endsWith(".md"))
+    );
+    return new Set(entries.map((e) => e.name));
   } catch {
     // Directory doesn't exist yet — nothing to skip
     return new Set();

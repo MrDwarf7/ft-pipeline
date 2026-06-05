@@ -29,7 +29,10 @@ const escapeValue = (val: string | number | null): string => {
 };
 
 // Replace positional ? placeholders with escaped values
-const interpolate = (sql: string, params: (string | number | null)[]): string => {
+const interpolate = (
+  sql: string,
+  params: (string | number | null)[],
+): string => {
   let idx = 0;
   return sql.replace(/\?/g, () => {
     if (idx >= params.length) return "?";
@@ -91,7 +94,7 @@ class Sqlite3Statement implements Statement {
   run(...params: (string | number | null)[]): void {
     // Support both spread args and single-array arg (common SQL lib pattern)
     const flatParams = params.length === 1 && Array.isArray(params[0])
-      ? params[0] as (string | number | null)[]
+      ? (params[0] as (string | number | null)[])
       : params;
     const fullSql = flatParams.length > 0 ? interpolate(this.sql, flatParams) : this.sql;
     execSql(this.dbPath, fullSql);
@@ -99,7 +102,7 @@ class Sqlite3Statement implements Statement {
 
   all<T = Record<string, unknown>>(...params: (string | number | null)[]): T[] {
     const flatParams = params.length === 1 && Array.isArray(params[0])
-      ? params[0] as (string | number | null)[]
+      ? (params[0] as (string | number | null)[])
       : params;
     const fullSql = flatParams.length > 0 ? interpolate(this.sql, flatParams) : this.sql;
     return querySql(this.dbPath, fullSql) as T[];

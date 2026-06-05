@@ -178,11 +178,7 @@ const writeCategoryPages = async (
       const outputPath = getCategoryOutputPath(category);
       const existingPath = options?.existingPath ?? outputPath;
 
-      const needsUpdateResult = await needsUpdate(
-        existingPath,
-        dir,
-        content,
-      );
+      const needsUpdateResult = await needsUpdate(existingPath, dir, content);
 
       if (needsUpdateResult) {
         await Deno.writeTextFile(outputPath, content);

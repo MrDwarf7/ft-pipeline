@@ -61,7 +61,7 @@ const main = async () => {
         break;
 
       case Command.Extract:
-        await pipeline.extract(args);
+        pipeline.extract(args);
         break;
 
       case Command.Merge:

@@ -187,60 +187,63 @@ const parseResponse = (
   const instructions = (timeline?.instructions as unknown[]) ?? [];
 
   // Extract entries from TimelineAddEntries instructions (match fieldtheory-cli loop)
-  const entries: Record<string, unknown>[] = [];
-  for (const inst of instructions) {
-    // TODO: refactor to use functional iterator
-    const instRecord = inst as Record<string, unknown>;
-    if (
-      instRecord.type === "TimelineAddEntries" &&
-      Array.isArray(instRecord.entries)
-    ) {
-      entries.push(...(instRecord.entries as Record<string, unknown>[]));
-    }
-  }
+  const entries = Array.from(
+    instructions.filter(
+      (inst) =>
+        (inst as Record<string, unknown>).type === "TimelineAddEntries" &&
+        Array.isArray((inst as Record<string, unknown>).entries),
+    ),
+  )
+    .map(
+      (inst) => (inst as Record<string, unknown>).entries as Record<string, unknown>[],
+    )
+    .flat();
 
-  const records: TweetData[] = [];
   let nextCursor: string | undefined;
 
-  for (const entry of entries) {
-    // TODO: refactor to use functional iterator
-    const entryRecord = entry as Record<string, unknown>;
+  // Process entries functionally - filter and map operations
+  const processedEntries = entries
+    .map((entry) => {
+      const entryRecord = entry as Record<string, unknown>;
 
-    // Check for cursor
-    if (
-      typeof entryRecord.entryId === "string" &&
-      (entryRecord.entryId as string).startsWith("cursor-bottom")
-    ) {
-      nextCursor = (entryRecord.content as Record<string, unknown>)?.value as
-        | string
+      // Check for cursor
+      if (
+        typeof entryRecord.entryId === "string" &&
+        (entryRecord.entryId as string).startsWith("cursor-bottom")
+      ) {
+        nextCursor = (entryRecord.content as Record<string, unknown>)?.value as
+          | string
+          | undefined;
+        return null; // Skip cursor entries
+      }
+
+      // Extract tweet result
+      const content = entryRecord.content as
+        | Record<string, unknown>
         | undefined;
-      continue;
-    }
+      const itemContent = content?.itemContent as
+        | Record<string, unknown>
+        | undefined;
+      const tweetResult = (itemContent?.tweet_results as Record<string, unknown>)?.result ??
+        (itemContent?.tweet_results as Record<string, unknown> | undefined);
 
-    // Extract tweet result
-    const content = entryRecord.content as Record<string, unknown> | undefined;
-    const itemContent = content?.itemContent as
-      | Record<string, unknown>
-      | undefined;
-    const tweetResult = (itemContent?.tweet_results as Record<string, unknown>)?.result ??
-      (itemContent?.tweet_results as Record<string, unknown> | undefined);
+      if (!tweetResult) return null;
 
-    if (!tweetResult) continue;
+      // Handle BOTH tweet result formats from X API:
+      //   Old: { __typename:"Tweet", limitedActionResults, tweet: { legacy, core, ... } }
+      //   New (current): { __typename:"Tweet", legacy, core, note_tweet, ... } — flat format
+      // The Zod schema expects { tweet: { legacy, core, ... } }, so for the flat format
+      // we wrap it to match. This way parseTweet works unchanged.
+      const tweetData = (tweetResult as Record<string, unknown>).tweet
+        ? tweetResult // old format: already has tweet wrapper
+        : { tweet: tweetResult }; // flat format: wrap it
 
-    // Handle BOTH tweet result formats from X API:
-    //   Old: { __typename:"Tweet", limitedActionResults, tweet: { legacy, core, ... } }
-    //   New (current): { __typename:"Tweet", legacy, core, note_tweet, ... } — flat format
-    // The Zod schema expects { tweet: { legacy, core, ... } }, so for the flat format
-    // we wrap it to match. This way parseTweet works unchanged.
-    const tweetData = (tweetResult as Record<string, unknown>).tweet
-      ? tweetResult // old format: already has tweet wrapper
-      : { tweet: tweetResult }; // flat format: wrap it
+      const record = parseTweet(tweetData as Record<string, unknown>);
+      return record;
+    })
+    .filter((r): r is TweetData => r !== null);
 
-    const record = parseTweet(tweetData as Record<string, unknown>);
-    if (record) records.push(record);
-  }
-
-  return { records, nextCursor };
+  return { records: processedEntries, nextCursor };
 };
 
 // ── Fetch page (GET, matches fieldtheory-cli) ────────────────
@@ -396,17 +399,16 @@ const fetchBatchImpl = async (
       // CORRECT pooledMap usage: pre-existing array + concurrent processing
       const batches = chunk(allTweets, 100);
 
-      const results: TweetData[] = [];
-      for await (
-        const batch of pooledMap(
-          concurrency,
-          batches,
-          (b: TweetData[]) => Promise.resolve(b), // identity fn (actual processing goes here)
-        )
-      ) {
-        results.push(...batch);
-      }
+      // Process batches concurrently and flatten results functionally
+      const batchResults = pooledMap(
+        concurrency,
+        batches,
+        (b: TweetData[]) => Promise.resolve(b), // identity fn (actual processing goes here)
+      );
 
+      // Flatten array of arrays (pooledMap returns TweetData[][])
+      const flatResults = await Array.fromAsync(batchResults);
+      const results: TweetData[] = flatResults.flat() as TweetData[];
       return results;
     },
   };

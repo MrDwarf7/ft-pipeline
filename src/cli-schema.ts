@@ -1,6 +1,8 @@
 // cli-schema.ts -- Single source of truth for CLI commands and options
 // Drives both help text generation and parseArgs config.
 
+// deno-fmt-ignore-file
+
 import { parseArgs } from "@std/cli/parse-args";
 
 export interface OptionDef {
@@ -17,18 +19,31 @@ export interface CommandDef {
 }
 
 export const COMMANDS: CommandDef[] = [
-  { name: "migrate", description: "Create/migrate pipeline DB schema (run first)" },
-  { name: "cookies extract", description: "Extract X session cookies (interactive)" },
+  {
+    name: "migrate",
+    description: "Create/migrate pipeline DB schema (run first)",
+  },
+  {
+    name: "cookies extract",
+    description: "Extract X session cookies (interactive)",
+  },
   { name: "cookies check", description: "Check if cookies file exists" },
   { name: "sync", description: "Sync bookmarks from X (requires cookies)" },
-  { name: "extract", description: "Extract articles via xtracticle + link to DB" },
+  {
+    name: "extract",
+    description: "Extract articles via xtracticle + link to DB",
+  },
   { name: "merge", description: "Merge Clippings enriched text back into DB" },
-  { name: "classify", description: "LLM classification for unclassified bookmarks" },
+  {
+    name: "classify",
+    description: "LLM classification for unclassified bookmarks",
+  },
   { name: "generate", description: "Regenerate md files from DB" },
   { name: "indexes", description: "Generate category/domain index notes" },
   {
     name: "full",
-    description: "Run all steps: sync -> extract -> merge -> classify -> generate -> indexes",
+    description:
+      "Run all steps: sync -> extract -> merge -> classify -> generate -> indexes",
   },
 ];
 
@@ -56,12 +71,32 @@ export const GLOBAL_OPTIONS: OptionDef[] = [
 ];
 
 export const SYNC_OPTIONS: OptionDef[] = [
-  { name: "max-pages", type: "string", description: "Max pages to fetch from X API" },
-  { name: "target-adds", type: "string", description: "Stop after N new bookmarks added" },
+  {
+    name: "max-pages",
+    type: "string",
+    description: "Max pages to fetch from X API",
+  },
+  {
+    name: "target-adds",
+    type: "string",
+    description: "Stop after N new bookmarks added",
+  },
   { name: "max-minutes", type: "string", description: "Stop after N minutes" },
-  { name: "rebuild", type: "boolean", description: "Wipe local DB and re-sync from scratch" },
-  { name: "continue", type: "boolean", description: "Resume from last sync position" },
-  { name: "gaps", type: "boolean", description: "Backfill missing gaps in the sync range" },
+  {
+    name: "rebuild",
+    type: "boolean",
+    description: "Wipe local DB and re-sync from scratch",
+  },
+  {
+    name: "continue",
+    type: "boolean",
+    description: "Resume from last sync position",
+  },
+  {
+    name: "gaps",
+    type: "boolean",
+    description: "Backfill missing gaps in the sync range",
+  },
 ];
 
 const ALL_OPTIONS = [...GLOBAL_OPTIONS, ...SYNC_OPTIONS];
@@ -74,7 +109,10 @@ export const getParseArgsConfig = (): Parameters<typeof parseArgs>[1] => ({
     ALL_OPTIONS.filter((o) => o.alias).map((o) => [o.alias!, o.name]),
   ),
   default: Object.fromEntries(
-    ALL_OPTIONS.filter((o) => o.default !== undefined).map((o) => [o.name, o.default]),
+    ALL_OPTIONS.filter((o) => o.default !== undefined).map((o) => [
+      o.name,
+      o.default,
+    ]),
   ),
 });
 
@@ -90,7 +128,11 @@ export const generateHelpText = (): string => {
 
   // Align descriptions
   const cmdWidth = Math.max(...COMMANDS.map((c) => c.name.length)) + 2;
-  lines.push(...COMMANDS.map((cmd) => `  ${cmd.name.padEnd(cmdWidth)}${cmd.description}`));
+  lines.push(
+    ...COMMANDS.map(
+      (cmd) => `  ${cmd.name.padEnd(cmdWidth)}${cmd.description}`,
+    ),
+  );
 
   lines.push("", "Options:");
   const formattedOpts = GLOBAL_OPTIONS.map((o) => {
@@ -99,7 +141,9 @@ export const generateHelpText = (): string => {
     return { label: flag + suffix, desc: o.description };
   });
   const optWidth = Math.max(...formattedOpts.map((o) => o.label.length)) + 2;
-  lines.push(...formattedOpts.map((opt) => `  ${opt.label.padEnd(optWidth)}${opt.desc}`));
+  lines.push(
+    ...formattedOpts.map((opt) => `  ${opt.label.padEnd(optWidth)}${opt.desc}`),
+  );
 
   lines.push("", "Sync options:");
   const formattedSync = SYNC_OPTIONS.map((o) => {
@@ -108,7 +152,11 @@ export const generateHelpText = (): string => {
     return { label: flag + suffix, desc: o.description };
   });
   const syncWidth = Math.max(...formattedSync.map((o) => o.label.length)) + 2;
-  lines.push(...formattedSync.map((opt) => `  ${opt.label.padEnd(syncWidth)}${opt.desc}`));
+  lines.push(
+    ...formattedSync.map(
+      (opt) => `  ${opt.label.padEnd(syncWidth)}${opt.desc}`,
+    ),
+  );
 
   return lines.join("\n");
 };
