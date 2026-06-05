@@ -3,15 +3,11 @@
 // Uses SHA-256 hashing to detect content changes before writing.
 // Only updates files when the content hash differs from the on-disk version.
 
-import { CONFIG } from "../config.ts";
+import { CONFIG, DOMAINS, TYPES } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
 import type { Database } from "../utils/db.ts";
-import {
-  hashFile,
-  hashContentSync,
-  needsUpdate,
-} from "../utils/hash.ts";
+import { needsUpdate } from "../utils/hash.ts";
 
 interface BookmarkEntry {
   tweet_id: string;
@@ -38,6 +34,7 @@ const queryBookmarks = (db: Database): BookmarkEntry[] =>
            COALESCE(clippings_text, text) as display_text
     FROM bookmarks
     WHERE primary_type IS NOT NULL
+      AND (author_handle IS NOT NULL AND author_handle != '')
     ORDER BY posted_at DESC
   `)
     .all<BookmarkEntry>();
@@ -179,17 +176,15 @@ const writeCategoryPages = async (
       );
 
       const outputPath = getCategoryOutputPath(category);
-      const existingPath = options?.existingPath
-        ? existingPath
-        : outputPath;
+      const existingPath = options?.existingPath ?? outputPath;
 
-      const needsUpdate = await needsUpdate(
+      const needsUpdateResult = await needsUpdate(
         existingPath,
         dir,
         content,
       );
 
-      if (needsUpdate) {
+      if (needsUpdateResult) {
         await Deno.writeTextFile(outputPath, content);
         logger.info("category index updated", {
           category,
@@ -245,17 +240,11 @@ const writeDomainPages = async (
       );
 
       const outputPath = getDomainOutputPath(domain);
-      const existingPath = options?.existingPath
-        ? existingPath
-        : outputPath;
+      const existingPath = options?.existingPath ?? outputPath;
 
-      const needsUpdate = await needsUpdate(
-        existingPath,
-        dir,
-        content,
-      );
+      const needsUpdateResult = await needsUpdate(existingPath, dir, content);
 
-      if (needsUpdate) {
+      if (needsUpdateResult) {
         await Deno.writeTextFile(outputPath, content);
         logger.info("domain index updated", {
           domain,
@@ -317,17 +306,11 @@ const writeEntityPages = async (
       );
 
       const outputPath = getEntityOutputPath(handle);
-      const existingPath = options?.existingPath
-        ? existingPath
-        : outputPath;
+      const existingPath = options?.existingPath ?? outputPath;
 
-      const needsUpdate = await needsUpdate(
-        existingPath,
-        dir,
-        content,
-      );
+      const needsUpdateResult = await needsUpdate(existingPath, dir, content);
 
-      if (needsUpdate) {
+      if (needsUpdateResult) {
         await Deno.writeTextFile(outputPath, content);
         logger.info("entity page updated", {
           handle,
@@ -361,32 +344,33 @@ const writeMasterIndex = async (
     new Date().toISOString()
   }\n---\n\n# Bookmark Index\n\nTotal: ${totalBookmarks} bookmarks\n\n## By Category\n\n${
     TYPES.map(
-      (t) => `- [[categories/${t}|${t}]] (${byCategory[t]?.length || 0})`,
+      (t: string) => `- [[categories/${t}|${t}]] (${byCategory[t]?.length || 0})`,
     ).join("\n")
-  }\n\n## By Domain\n\n${
+  }
+\n## By Domain\n\n${
     DOMAINS.map(
-      (d) => `- [[domains/${d}|${d}]] (${byDomain[d]?.length || 0})`,
+      (d: string) => `- [[domains/${d}|${d}]] (${byDomain[d]?.length || 0})`,
     ).join("\n")
-  }\n\n## Top Entities\n\n${
+  }
+\n## Top Entities\n\n${
     topEntities
       .map(
         ([handle, entries]) => `- [[entities/${handle}|@${handle}]] (${entries.length})`,
       )
       .join("\n")
-  }\n`;
+  }
+  }`;
 
   const outputPath = getMasterIndexPath();
-  const existingPath = options?.existingPath
-    ? existingPath
-    : outputPath;
+  const existingPath = options?.existingPath ?? outputPath;
 
-  const needsUpdate = await needsUpdate(
+  const needsUpdateResult = await needsUpdate(
     existingPath,
     CONFIG.mdOutputDir,
     content,
   );
 
-  if (needsUpdate) {
+  if (needsUpdateResult) {
     await Deno.writeTextFile(outputPath, content);
     logger.info("master index updated", { path: outputPath });
   } else {

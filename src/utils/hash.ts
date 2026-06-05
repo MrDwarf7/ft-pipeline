@@ -4,17 +4,9 @@
 // comparison before writing index files. Uses Web Crypto API for
 // efficient in-memory hashing.
 
-import { CONFIG } from "../config.ts";
-
 // ── Constants ─────────────────────────────────────────────────
 // Use a reasonable chunk size for large file reading
-const CHUNK_SIZE = 65536; // 64KB chunks for file reading
-
-// ── Type definitions ──────────────────────────────────────────
-type HashResult = {
-  hash: string;
-  size: number;
-};
+// const CHUNK_SIZE = 65536; // 64KB chunks for file reading
 
 // ── File hashing ──────────────────────────────────────────────
 
@@ -26,50 +18,54 @@ type HashResult = {
  *
  * @param path - Absolute or relative path to the file
  * @param baseDir - Base directory to resolve relative paths against
- * @returns Promise resolving to hash string and file size
+ * @returns Promise resolving to hash string
  */
 export const hashFile = async (
   path: string,
   baseDir: string,
-): Promise<HashResult> => {
+): Promise<string> => {
   const fullPath = path.startsWith("/") ? path : `${baseDir}/${path}`;
   const file = await Deno.open(fullPath, { read: true });
 
   try {
-    const crypto = window.crypto || crypto;
-    const encoder = new TextEncoder();
+    const crypto = globalThis.crypto;
 
-    // Initialize hash
-    const hash = await crypto.subtle.digest("SHA-256", encoder.encode(""));
+    // Read entire file into ArrayBuffer
+    const stat = file.statSync();
+    const size = stat?.size ?? 0;
 
-    // Read file in chunks and update hash
-    let chunk: Uint8Array | null;
-    while ((chunk = await file.read(CHUNK_SIZE)) !== null) {
-      await crypto.subtle.digest(
-        "SHA-256",
-        await crypto.subtle.importKey(
-          "raw",
-          chunk,
-          "SHA-256",
-          false,
-          ["digest"],
-        ),
-      );
+    // Use existing file (already in memory as we're reading from it)
+    if (size > 0) {
+      const buffer = new Uint8Array(size);
+      let offset = 0;
+      const reads: Promise<number | null>[] = [];
+      while (offset < size) {
+        // Deno.file.read() takes only 1 argument: the buffer
+        reads.push(file.read(buffer));
+        offset += buffer.byteLength;
+      }
+
+      // Hash the buffer
+      const hash = await crypto.subtle.digest("SHA-256", buffer);
+
+      // Convert hash to hex string
+      const bytes = hash as ArrayBuffer;
+      const view = new DataView(bytes);
+      const hex = [];
+      for (let i = 0; i < view.byteLength; i++) {
+        // TODO: refactor to use functional iterator
+        hex.push(view.getUint8(i).toString(16).padStart(2, "0"));
+      }
+      return hex.join("");
     }
 
-    // Finalize
-    const finalHash = await crypto.subtle.digest("SHA-256", new Uint8Array(0));
-
-    return {
-      hash: Array.from(finalHash)
-        .map((byte) => byte.toString(16).padStart(2, "0"))
-        .join(""),
-      size: file.statSync()?.size ?? 0,
-    };
+    return "";
   } finally {
     file.close();
   }
 };
+
+// ── Content hashing ────────────────────────────────────────────
 
 /**
  * Compute SHA-256 hash of a string (content).
@@ -77,20 +73,21 @@ export const hashFile = async (
  * @param content - String content to hash
  * @returns Promise resolving to hash string
  */
-export const hashContent = async (
-  content: string,
-): Promise<string> => {
-  const crypto = window.crypto || crypto;
+export const hashContent = async (content: string): Promise<string> => {
+  const crypto = globalThis.crypto;
   const encoder = new TextEncoder();
 
-  const hash = await crypto.subtle.digest(
-    "SHA-256",
-    encoder.encode(content),
-  );
+  const hash = await crypto.subtle.digest("SHA-256", encoder.encode(content));
 
-  return Array.from(hash)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
+  // Convert hash to hex string
+  const bytes = hash as ArrayBuffer;
+  const view = new DataView(bytes);
+  const hex = [];
+  for (let i = 0; i < view.byteLength; i++) {
+    // TODO: refactor to use functional iterator
+    hex.push(view.getUint8(i).toString(16).padStart(2, "0"));
+  }
+  return hex.join("");
 };
 
 /**
@@ -99,17 +96,21 @@ export const hashContent = async (
  * @param content - String content to hash
  * @returns Hash string
  */
-export const hashContentSync = (
-  content: string,
-): string => {
-  const crypto = window.crypto || crypto;
+export const hashContentSync = async (content: string): Promise<string> => {
+  const crypto = globalThis.crypto;
   const encoder = new TextEncoder();
 
   const hash = crypto.subtle.digest("SHA-256", encoder.encode(content));
 
-  return Array.from(hash)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
+  // Convert hash to hex string
+  const bytes = (await hash) as ArrayBuffer;
+  const view = new DataView(bytes);
+  const hex = [];
+  for (let i = 0; i < view.byteLength; i++) {
+    // TODO: refactor to use functional iterator
+    hex.push(view.getUint8(i).toString(16).padStart(2, "0"));
+  }
+  return hex.join("");
 };
 
 // ── Comparison utilities ──────────────────────────────────────
@@ -147,10 +148,13 @@ export const needsUpdate = async (
     const existingHash = await hashFile(existingPath, baseDir);
     const newHash = await hashContent(newContent);
 
-    return !hashesMatch(existingHash.hash, newHash);
+    return !hashesMatch(existingHash, newHash);
   } catch (error) {
     // If file doesn't exist or other error, assume update needed
-    console.error(`Error checking update for ${existingPath}:`, error);
+    (globalThis as typeof globalThis).console?.error(
+      `Error checking update for ${existingPath}:`,
+      error,
+    );
     return true;
   }
 };

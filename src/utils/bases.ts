@@ -1,4 +1,8 @@
-import * as path from "@std/path";
+// utils/bases.ts -- Application environment and base path utilities
+//
+// Provides environment detection and hardcoded base paths for
+// the ft-pipeline project. All paths are absolute and point to
+// the new config directory at /home/dwarf/.config/ft-pipeline/.
 
 export type AppEnv = "DEV" | "UAT" | "PROD";
 
@@ -36,8 +40,7 @@ export const BASES = Object.freeze({
   mdOutputDir: "/home/dwarf/.config/ft-pipeline/output",
 
   // Bookmark classification results
-  classificationResultsPath:
-    "/home/dwarf/.config/ft-pipeline/classification-results.json",
+  classificationResultsPath: "/home/dwarf/.config/ft-pipeline/classification-results.json",
 
   // Pipeline logs
   logDir: "/home/dwarf/.config/ft-pipeline/logs",

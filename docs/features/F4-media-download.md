@@ -72,11 +72,15 @@ export const runFetchMedia = async (options: {
   const db = new Database(CONFIG.pipelineDbPath);
 
   // 1. Query bookmarks with media
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT tweet_id, media_json, author_profile_image_url
     FROM bookmarks
     WHERE media_count > 0 OR author_profile_image_url IS NOT NULL
-  `).all<MediaRow>();
+  `,
+    )
+    .all<MediaRow>();
 
   // 2. Download each media asset
   for (const row of rows) {
@@ -86,7 +90,11 @@ export const runFetchMedia = async (options: {
     }
 
     if (!options.skipProfileImages && row.author_profile_image_url) {
-      await downloadMedia(row.author_profile_image_url, row.tweet_id, "profile");
+      await downloadMedia(
+        row.author_profile_image_url,
+        row.tweet_id,
+        "profile",
+      );
     }
   }
 

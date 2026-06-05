@@ -43,7 +43,9 @@ const slugify = (text: string, maxLen = 60): string =>
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const toDateParts = (iso: string): { yyyy: string; mm: string; dd: string; day: string } => {
+const toDateParts = (
+  iso: string,
+): { yyyy: string; mm: string; dd: string; day: string } => {
   const d = new Date(iso);
   const yyyy = String(d.getFullYear());
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -72,7 +74,8 @@ const bookmarkTemplate: BookmarkTemplate = (b) => {
 
   // Derive a display title from the first line of content
   // Strip any leading markdown heading markers so we don't get double `#` in the template
-  const firstLine = b.display_text.split("\n")[0]
+  const firstLine = b.display_text
+    .split("\n")[0]
     .replace(/^#+\s*/, "")
     .trim()
     .slice(0, 120);
@@ -91,7 +94,7 @@ const bookmarkTemplate: BookmarkTemplate = (b) => {
     `type: "${b.primary_type || "unclassified"}"`,
     `domain: "${b.primary_domain || "uncategorized"}"`,
     `content_type: "${b.content_type || "unknown"}"`,
-    ...(b.confidence != null ? [`confidence: ${b.confidence}`] : []),
+    ...(b.confidence !== null ? [`confidence: ${b.confidence}`] : []),
     ...(b.media_count > 0 ? [`media_count: ${b.media_count}`] : []),
     "---",
     "",
@@ -105,12 +108,8 @@ const bookmarkTemplate: BookmarkTemplate = (b) => {
     `- **Domain:** [[domains/${b.primary_domain || "uncategorized"}]]`,
     `- **Posted:** ${yyyy}-${mm}-${dd}`,
     `- **Original:** [View on X](${b.url})`,
-    typeLinks.length > 1
-      ? `- **All types:** ${typeLinks.join(", ")}`
-      : "",
-    domainLinks.length > 1
-      ? `- **All domains:** ${domainLinks.join(", ")}`
-      : "",
+    typeLinks.length > 1 ? `- **All types:** ${typeLinks.join(", ")}` : "",
+    domainLinks.length > 1 ? `- **All domains:** ${domainLinks.join(", ")}` : "",
     "",
     // Related section — cross-links to other things in the same space
     "## See Also",
@@ -135,7 +134,8 @@ const buildFilename = (b: BookmarkData): string => {
 
 const fetchAllBookmarks = (): BookmarkData[] => {
   const db = getPipelineDb();
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(`
     SELECT
       tweet_id,
       url,
@@ -153,7 +153,8 @@ const fetchAllBookmarks = (): BookmarkData[] => {
       media_count
     FROM bookmarks
     ORDER BY posted_at DESC
-  `).all<Record<string, unknown>>();
+  `)
+    .all<Record<string, unknown>>();
 
   return rows.map((r) => ({
     tweet_id: r.tweet_id as string,
@@ -182,19 +183,20 @@ interface FileToWrite {
   content: string;
 }
 
-const writeBatch = async (files: FileToWrite[], dir: string): Promise<number> => {
-  let written = 0;
+const writeBatch = async (
+  files: FileToWrite[],
+  dir: string,
+): Promise<number> => {
+  const writes: Promise<unknown>[] = [];
   for (let i = 0; i < files.length; i += BATCH_SIZE) {
+    // TODO: refactor to use functional iterator
     const chunk = files.slice(i, i + BATCH_SIZE);
-    await Promise.all(
-      chunk.map((f) => Deno.writeTextFile(`${dir}/${f.filename}`, f.content)),
-    );
-    written += chunk.length;
+    const chunkWrites = chunk.map((f) => Deno.writeTextFile(`${dir}/${f.filename}`, f.content));
+    writes.push(...chunkWrites);
   }
-  return written;
+  await Promise.all(writes);
+  return files.length;
 };
-
-// ── Scan existing files on disk ──
 
 const scanExistingFilenames = async (dir: string): Promise<Set<string>> => {
   try {
@@ -214,7 +216,9 @@ const scanExistingFilenames = async (dir: string): Promise<Set<string>> => {
 // ── Main ──
 
 export const runGenerate = async (): Promise<void> => {
-  logger.info("generate started — reading classified bookmarks from pipeline.db");
+  logger.info(
+    "generate started — reading classified bookmarks from pipeline.db",
+  );
 
   const bookmarks = fetchAllBookmarks();
   logger.info("fetched bookmarks for rendering", { count: bookmarks.length });
@@ -243,7 +247,10 @@ export const runGenerate = async (): Promise<void> => {
   const skipped = allFiles.length - toWrite.length;
 
   if (skipped > 0) {
-    logger.info("skipped existing files", { skipped, reason: "already on disk" });
+    logger.info("skipped existing files", {
+      skipped,
+      reason: "already on disk",
+    });
   }
 
   if (toWrite.length === 0) {
@@ -253,7 +260,10 @@ export const runGenerate = async (): Promise<void> => {
   }
 
   // Phase 2: Batch-write only the missing files to disk
-  logger.info("writing new rendered files", { count: toWrite.length, batchSize: BATCH_SIZE });
+  logger.info("writing new rendered files", {
+    count: toWrite.length,
+    batchSize: BATCH_SIZE,
+  });
   const written = await writeBatch(toWrite, outDir);
 
   closePipelineDb();

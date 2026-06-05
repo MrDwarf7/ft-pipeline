@@ -12,6 +12,7 @@ import type {
   UncheckedSource,
 } from "./index.ts";
 import { TweetDataSchema } from "./schema.ts";
+import { logger } from "./../utils/logger.ts";
 
 // ── Hard-coded constants ──────────────────────────────────
 const BOOKMARKS_QUERY_ID = "Z9GWmP0kP2dajyckAaDUBw";
@@ -85,7 +86,9 @@ const validateConnectivity = async (
       const hasErrors = Array.isArray(parsed.errors) && parsed.errors.length > 0;
       const hasNoData = !parsed.data;
       if (hasErrors && hasNoData) {
-        const messages = parsed.errors.map((e: Record<string, unknown>) => e.message).join("; ");
+        const messages = parsed.errors
+          .map((e: Record<string, unknown>) => e.message)
+          .join("; ");
         throw new Error(`GraphQL API auth error: ${messages}`);
       }
     } catch (err) {
@@ -172,7 +175,9 @@ const parseResponse = (
     );
   }
 
-  const bookmarkTimeline = data?.bookmark_timeline_v2 as Record<string, unknown> | undefined;
+  const bookmarkTimeline = data?.bookmark_timeline_v2 as
+    | Record<string, unknown>
+    | undefined;
   if (!bookmarkTimeline) {
     throw new Error(
       `X API response missing .data.bookmark_timeline_v2 — keys: ${Object.keys(data).join(", ")}`,
@@ -184,6 +189,7 @@ const parseResponse = (
   // Extract entries from TimelineAddEntries instructions (match fieldtheory-cli loop)
   const entries: Record<string, unknown>[] = [];
   for (const inst of instructions) {
+    // TODO: refactor to use functional iterator
     const instRecord = inst as Record<string, unknown>;
     if (
       instRecord.type === "TimelineAddEntries" &&
@@ -197,6 +203,7 @@ const parseResponse = (
   let nextCursor: string | undefined;
 
   for (const entry of entries) {
+    // TODO: refactor to use functional iterator
     const entryRecord = entry as Record<string, unknown>;
 
     // Check for cursor
@@ -204,18 +211,19 @@ const parseResponse = (
       typeof entryRecord.entryId === "string" &&
       (entryRecord.entryId as string).startsWith("cursor-bottom")
     ) {
-      nextCursor = (entryRecord.content as Record<string, unknown>)
-        ?.value as string | undefined;
+      nextCursor = (entryRecord.content as Record<string, unknown>)?.value as
+        | string
+        | undefined;
       continue;
     }
 
     // Extract tweet result
     const content = entryRecord.content as Record<string, unknown> | undefined;
-    const itemContent = content?.itemContent as Record<string, unknown> | undefined;
-    const tweetResult = (itemContent?.tweet_results as Record<string, unknown>)
-      ?.result ?? itemContent?.tweet_results as
-        | Record<string, unknown>
-        | undefined;
+    const itemContent = content?.itemContent as
+      | Record<string, unknown>
+      | undefined;
+    const tweetResult = (itemContent?.tweet_results as Record<string, unknown>)?.result ??
+      (itemContent?.tweet_results as Record<string, unknown> | undefined);
 
     if (!tweetResult) continue;
 
@@ -225,7 +233,7 @@ const parseResponse = (
     // The Zod schema expects { tweet: { legacy, core, ... } }, so for the flat format
     // we wrap it to match. This way parseTweet works unchanged.
     const tweetData = (tweetResult as Record<string, unknown>).tweet
-      ? tweetResult  // old format: already has tweet wrapper
+      ? tweetResult // old format: already has tweet wrapper
       : { tweet: tweetResult }; // flat format: wrap it
 
     const record = parseTweet(tweetData as Record<string, unknown>);
@@ -294,13 +302,21 @@ const fetchAllPages = async (
   const pageIsStale = newRecords.length === 0;
 
   if (records.length === 0) {
-    console.error(`[sync] page returned 0 records (cursor: ${cursor ? cursor.slice(0, 20) + "..." : "initial"})`);
+    logger.error(
+      `[sync] page returned 0 records (cursor: ${
+        cursor ? cursor.slice(0, 20) + "..." : "initial"
+      })`,
+    );
   } else if (existingInPage === records.length) {
-    console.error(`[sync] page: ${records.length} records, ALL ${existingInPage} already in DB — likely caught up`);
+    logger.error(
+      `[sync] page: ${records.length} records, ALL ${existingInPage} already in DB — likely caught up`,
+    );
   } else if (existingInPage > 0) {
-    console.error(`[sync] page: ${records.length} records (${existingInPage} existing, ${newRecords.length} new)`);
+    logger.error(
+      `[sync] page: ${records.length} records (${existingInPage} existing, ${newRecords.length} new)`,
+    );
   } else {
-    console.error(`[sync] page: ${records.length} records, all new`);
+    logger.error(`[sync] page: ${records.length} records, all new`);
   }
 
   const newAcc = [...acc, newRecords];

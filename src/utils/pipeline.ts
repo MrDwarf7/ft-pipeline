@@ -117,7 +117,11 @@ export const runFull = async (args: Args) => {
             hint = stepName === "Classify"
               ? "LLM server not running at localhost:1234. Start with: LD_LIBRARY_PATH=/opt/llama-cpp/lib /opt/llama-cpp/bin/llama-server -m <model.gguf> --port 1234"
               : "Connection refused — check the target service is running";
-          } else if (lower.includes("connect") || lower.includes("dns") || lower.includes("timeout")) {
+          } else if (
+            lower.includes("connect") ||
+            lower.includes("dns") ||
+            lower.includes("timeout")
+          ) {
             hint = stepName === "Sync"
               ? "X GraphQL API unreachable — check network or cookies may have expired"
               : stepName === "Extract"
@@ -130,7 +134,11 @@ export const runFull = async (args: Args) => {
           }
 
           if (hint) logger.error("step hint", { step: stepName, hint });
-          results.push({ step: stepName, status: "failed", error: hint ? `${msg} — ${hint}` : msg });
+          results.push({
+            step: stepName,
+            status: "failed",
+            error: hint ? `${msg} — ${hint}` : msg,
+          });
         }
       }),
     Promise.resolve(),
