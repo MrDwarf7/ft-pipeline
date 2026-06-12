@@ -2,12 +2,12 @@ import { type ConnectedLLM, type LLMChatOptions, type LLMProvider } from "./inde
 
 interface OpenAICompatConfig {
   baseUrl: string;
-  model: string;
+  model?: string;
   jsonMode?: "json_object" | "schema" | "prompt";
 }
 
 export const createOpenAICompat = (config: OpenAICompatConfig): LLMProvider => {
-  const { baseUrl, model: _model } = config;
+  const { baseUrl, model: configuredModel } = config;
   const jsonMode = config.jsonMode ?? "json_object";
 
   return {
@@ -19,7 +19,7 @@ export const createOpenAICompat = (config: OpenAICompatConfig): LLMProvider => {
       const models = data.data ?? data.models ?? [];
       if (models.length === 0) throw new Error("no models loaded");
 
-      const resolvedModel = models[0].id;
+      const resolvedModel = configuredModel ?? models[0].id;
 
       const connected: ConnectedLLM = {
         async chat(options: LLMChatOptions): Promise<string> {
