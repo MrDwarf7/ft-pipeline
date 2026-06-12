@@ -11,10 +11,13 @@ regressions.
 
 ## Documentation Standards
 
-- **Use `/* */` for multi-line comments.** Do not use consecutive `//` lines as a substitute for block comments.
-- **No unicode symbols in source code.** Em-dashes `—`, en-dashes `–`, smart quotes, etc. are banned from `.ts` files. Use plain ASCII: `--` for dashes, `'` and `"` for quotes.
-- **Exception:** Unicode is allowed inside template strings that produce user-facing output (markdown, wiki pages, log messages displayed to humans).
-- **Keep comments lean.** Explain *why*, not *what*. If the code is self-evident, don't comment.
+- **Use `/* */` for multi-line comments.** Do not use consecutive `//` lines as a substitute for
+  block comments.
+- **No unicode symbols in source code.** Em-dashes `—`, en-dashes `–`, smart quotes, etc. are banned
+  from `.ts` files. Use plain ASCII: `--` for dashes, `'` and `"` for quotes.
+- **Exception:** Unicode is allowed inside template strings that produce user-facing output
+  (markdown, wiki pages, log messages displayed to humans).
+- **Keep comments lean.** Explain _why_, not _what_. If the code is self-evident, don't comment.
 - **No section headers in comments.** Don't use `── Pure helpers ──` or similar banners.
 - **File headers:** One-line `/** Description of what this file does. */` at most.
 
@@ -256,25 +259,27 @@ This is OUR database. `migrate.ts` creates it. We never touch ft's bookmarks.db.
 
 ```json
 {
-  "tweets": [{
-    "url": "",
-    "id": "",
-    "text": "",
-    "raw_text": { "text": "" },
-    "author": { "screen_name": "", "name": "" },
-    "likes": 0,
-    "bookmarks": 0,
-    "views": 0,
-    "is_note_tweet": false,
-    "article": {
-      "title": "",
-      "preview_text": "",
-      "content": { "blocks": [], "entityMap": {} }
-    },
-    "media": {
-      "all": [{ "type": "video|photo|animated_gif", "url": "" }]
+  "tweets": [
+    {
+      "url": "",
+      "id": "",
+      "text": "",
+      "raw_text": { "text": "" },
+      "author": { "screen_name": "", "name": "" },
+      "likes": 0,
+      "bookmarks": 0,
+      "views": 0,
+      "is_note_tweet": false,
+      "article": {
+        "title": "",
+        "preview_text": "",
+        "content": { "blocks": [], "entityMap": {} }
+      },
+      "media": {
+        "all": [{ "type": "video|photo|animated_gif", "url": "" }]
+      }
     }
-  }]
+  ]
 }
 ```
 
