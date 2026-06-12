@@ -1,7 +1,4 @@
-// commands/indexes.ts -- Generate category/domain index notes with hash-based caching
-//
-// Uses SHA-256 hashing to detect content changes before writing.
-// Only updates files when the content hash differs from the on-disk version.
+/** Generate category/domain index notes with hash-based caching */
 
 import { CONFIG, DOMAINS, TYPES } from "../config.ts";
 import { logger } from "../utils/logger.ts";
@@ -23,8 +20,6 @@ interface BookmarkEntry {
 
 type LinkType = "category" | "domain";
 
-// -- DB --
-
 const queryBookmarks = (db: Database): BookmarkEntry[] =>
   db
     .prepare(`
@@ -39,8 +34,6 @@ const queryBookmarks = (db: Database): BookmarkEntry[] =>
   `)
     .all<BookmarkEntry>();
 
-// -- Grouping --
-
 const groupBy = <T>(
   items: T[],
   key: (item: T) => string,
@@ -52,8 +45,6 @@ const groupBy = <T>(
     },
     {} as Record<string, T[]>,
   );
-
-// -- Formatting --
 
 const formatBookmarkLine = (b: BookmarkEntry, linkType: LinkType): string => {
   const date = b.posted_at ? new Date(b.posted_at).toISOString().split("T")[0] : "unknown";
@@ -68,8 +59,6 @@ const formatBookmarkLine = (b: BookmarkEntry, linkType: LinkType): string => {
     b.likes > 100 ? ` | ❤️ ${b.likes}` : ""
   }`;
 };
-
-// -- Page builders --
 
 interface PageSection {
   heading: string;
@@ -107,8 +96,6 @@ const renderPage = (
       .join("\n\n")
   }`;
 
-// -- Output path utilities --
-
 const getCategoryOutputPath = (category: string) => {
   const dir = `${CONFIG.mdOutputDir}/categories`;
   return `${dir}/${category}.md`;
@@ -127,8 +114,6 @@ const getEntityOutputPath = (handle: string) => {
 const getMasterIndexPath = () => {
   return `${CONFIG.mdOutputDir}/index.md`;
 };
-
-// -- Page writers with hash-based caching --
 
 interface WriteOptions {
   existingPath: string | null;
@@ -373,8 +358,6 @@ const writeMasterIndex = async (
     logger.debug("master index unchanged (hash match)", { path: outputPath });
   }
 };
-
-// -- Main --
 
 export const runIndexes = async (): Promise<void> => {
   logger.info("indexes started");

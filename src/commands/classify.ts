@@ -40,7 +40,7 @@ const classifyRow = async (
 
   if (!content || content.trim().length < 10) {
     markShortTweet(db, row.tweet_id);
-    logger.info("short tweet — auto-classified as meme-shitpost", {
+    logger.info("short tweet -- auto-classified as meme-shitpost", {
       tweet_id: row.tweet_id,
       text: content.slice(0, 60),
     });
@@ -128,7 +128,7 @@ export const runClassify = async (
     logger.info("found unclassified bookmarks", { count: rows.length });
 
     if (rows.length === 0) {
-      logger.info("all bookmarks already classified — nothing to do");
+      logger.info("all bookmarks already classified -- nothing to do");
       return;
     }
     if (options.dryRun) return dryRunPreview(rows);

@@ -1,25 +1,5 @@
-// utils/hash.ts -- SHA-256 hashing utilities for content comparison
-//
-// Provides functions to compute file hashes and content hashes for
-// comparison before writing index files. Uses Web Crypto API for
-// efficient in-memory hashing.
+/** SHA-256 hashing for content comparison before writing index files */
 
-// ── Constants ─────────────────────────────────────────────────
-// Use a reasonable chunk size for large file reading
-// const CHUNK_SIZE = 65536; // 64KB chunks for file reading
-
-// ── File hashing ──────────────────────────────────────────────
-
-/**
- * Compute SHA-256 hash of a file by reading it in chunks.
- *
- * Reads the file in 64KB chunks and accumulates the hash digest.
- * This is memory-efficient for large files.
- *
- * @param path - Absolute or relative path to the file
- * @param baseDir - Base directory to resolve relative paths against
- * @returns Promise resolving to hash string
- */
 export const hashFile = async (
   path: string,
   baseDir: string,
@@ -37,7 +17,7 @@ export const hashFile = async (
       const buffer = new Uint8Array(size);
       const CHUNK_SIZE = 65536;
 
-      // Read file in chunks — collect promises, then await all
+      // Read file in chunks -- collect promises, then await all
       const readPromises: Promise<number | null>[] = [];
       const chunks = Math.ceil(size / CHUNK_SIZE);
       for (let i = 0; i < chunks; i++) {
@@ -63,14 +43,6 @@ export const hashFile = async (
   }
 };
 
-// ── Content hashing ────────────────────────────────────────────
-
-/**
- * Compute SHA-256 hash of a string (content).
- *
- * @param content - String content to hash
- * @returns Promise resolving to hash string
- */
 export const hashContent = async (content: string): Promise<string> => {
   const crypto = globalThis.crypto;
   const encoder = new TextEncoder();
@@ -80,12 +52,6 @@ export const hashContent = async (content: string): Promise<string> => {
   return Array.from(hashArray, (b) => b.toString(16).padStart(2, "0")).join("");
 };
 
-/**
- * Compute SHA-256 hash of a string (content) synchronously.
- *
- * @param content - String content to hash
- * @returns Hash string
- */
 export const hashContentSync = async (content: string): Promise<string> => {
   const crypto = globalThis.crypto;
   const encoder = new TextEncoder();
@@ -95,27 +61,10 @@ export const hashContentSync = async (content: string): Promise<string> => {
   return Array.from(hashArray, (b) => b.toString(16).padStart(2, "0")).join("");
 };
 
-// ── Comparison utilities ──────────────────────────────────────
-
-/**
- * Check if two hashes are equal.
- *
- * @param hash1 - First hash string
- * @param hash2 - Second hash string
- * @returns True if hashes match
- */
 export const hashesMatch = (hash1: string, hash2: string): boolean => {
   return hash1.toLowerCase() === hash2.toLowerCase();
 };
 
-/**
- * Check if a file needs to be updated by comparing hashes.
- *
- * @param existingPath - Path to existing file on disk
- * @param baseDir - Base directory for resolving paths
- * @param newContent - New content to compare against
- * @returns Promise resolving to true if update needed
- */
 export const needsUpdate = async (
   existingPath: string | null,
   baseDir: string,

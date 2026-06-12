@@ -82,15 +82,15 @@ import { classifyTweet, buildClippingContent, ... } from "../extraction/shared.t
 const extractSingle = async (row: Row) => {
   // Replace xtracticle API call
   const tweetData = await fetchTweetDirectly(row.tweet_id);
-  
+
   // Reuse existing processing (now in shared.ts)
   const { dir, type } = classifyTweet(tweetData);
   const content = buildClippingContent(tweetData, type);
-  
+
   // Save clipping
   const path = `${CONFIG.clippingsBase}/${dir}/${buildFilename(tweetData)}`;
   await Deno.writeTextFile(path, content);
-  
+
   return { clippingPath: path, status: "extracted" };
 };
 ```

@@ -1,7 +1,4 @@
-// pipeline.ts -- Pipeline composition and full run orchestration
-//
-// Key change: we OWN pipeline.db. Sync reads from X directly, writes into
-// our DB. Extract/Merge/Classify/Generate all read from pipeline.db.
+/** Pipeline composition and full run orchestration */
 
 import { Args, getPassword } from "../types.ts";
 import { runMigrate } from "../commands/migrate.ts";
@@ -59,7 +56,7 @@ export const runFull = async (args: Args) => {
   const isDryRun = args["dry-run"];
 
   if (isDryRun) {
-    logger.info("dry run — no steps will execute", {
+    logger.info("dry run -- no steps will execute", {
       steps: [
         "Migrate",
         "Sync",
@@ -102,12 +99,7 @@ export const runFull = async (args: Args) => {
           const msg = err instanceof Error ? err.message : String(err);
           logger.error("step failed", { step: stepName, error: msg });
 
-          // TODO: this is disgusting.
-          // We have `let` usage here we can likely avoid entirely.
-          // We have chained conditionals AND chained turnary's! This could be refactored to be more data-driven.
-          // We have a dead Promise.resolve() at the end we can also probably avoid if we structure correctly.
-
-          // Attach descriptive hints so cron/LM agents know what's wrong
+          // TODO: refactor -- data-driven hints, remove let, flatten ternaries
           const lower = msg.toLowerCase();
           let hint = "";
           if (
@@ -116,28 +108,28 @@ export const runFull = async (args: Args) => {
           ) {
             hint = stepName === "Classify"
               ? "LLM server not running at localhost:1234. Start with: LD_LIBRARY_PATH=/opt/llama-cpp/lib /opt/llama-cpp/bin/llama-server -m <model.gguf> --port 1234"
-              : "Connection refused — check the target service is running";
+              : "Connection refused -- check the target service is running";
           } else if (
             lower.includes("connect") ||
             lower.includes("dns") ||
             lower.includes("timeout")
           ) {
             hint = stepName === "Sync"
-              ? "X GraphQL API unreachable — check network or cookies may have expired"
+              ? "X GraphQL API unreachable -- check network or cookies may have expired"
               : stepName === "Extract"
-              ? "xtracticle API unreachable — check network"
-              : "Network error — check connectivity";
+              ? "xtracticle API unreachable -- check network"
+              : "Network error -- check connectivity";
           } else if (lower.includes("password") || lower.includes("cookie")) {
             hint = "Check FT_COOKIES_PATH and FT_PIPELINE_PASSWORD env vars";
           } else if (lower.includes("no models")) {
-            hint = "LLM server is running but has no model loaded — check llama-server model path";
+            hint = "LLM server is running but has no model loaded -- check llama-server model path";
           }
 
           if (hint) logger.error("step hint", { step: stepName, hint });
           results.push({
             step: stepName,
             status: "failed",
-            error: hint ? `${msg} — ${hint}` : msg,
+            error: hint ? `${msg} -- ${hint}` : msg,
           });
         }
       }),

@@ -1,11 +1,4 @@
-// utils/db.ts -- Centralized Pipeline DB singleton
-// Uses sqlite3 CLI subprocess via Deno.Command.outputSync().
-// Each SQL statement is passed as a command-line argument.
-// This avoids @db/sqlite FFI segfaults while keeping operations synchronous.
-//
-// NOTE: BEGIN/COMMIT/ROLLBACK are NOT supported across multiple calls
-// since each call is a separate process. Callers should remove transaction
-// wrapping (the codebase has been updated accordingly).
+/** Pipeline DB singleton via sqlite3 CLI subprocess. No transactions across calls. */
 
 import { CONFIG } from "../config.ts";
 import { logger } from "./logger.ts";
@@ -40,7 +33,7 @@ const interpolate = (
   });
 };
 
-// sqlite3 with stdout as args — returns stdout text
+// sqlite3 with stdout as args -- returns stdout text
 const sqlite3 = (
   dbPath: string,
   args: string[],

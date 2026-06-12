@@ -1,7 +1,4 @@
-// utils/logger.ts -- Centralised structured JSON logger
-// Writes to stdout (with ANSI colors) AND to a time-rotated file
-// at CONFIG.logDir (currently /home/dwarf/.config/ft-pipeline/logs/)
-// Filename format: pipeline-YYYY-MM-DD_HH-MM-SS.log
+/** Structured JSON logger -- stdout (ANSI) + time-rotated file at CONFIG.logDir */
 
 import { CONFIG } from "../config.ts";
 
@@ -52,10 +49,6 @@ export const logger = {
   debug: (message: string, data?: LogData) => log("debug", message, data),
 };
 
-// ── File-backed log ─────────────────────────────────────────────────
-// Writes a copy of structured logs to a time-rotated file in the
-// pipeline log directory (format: pipeline-YYYY-MM-DD_HH-MM-SS.log).
-
 let logStream: Deno.FsFile | null = null;
 let logDate = "";
 let logTime = "";
@@ -90,6 +83,6 @@ export const logToFile = (line: string): void => {
     const file = getLogFile();
     file.writeSync(encoder.encode(line + "\n"));
   } catch {
-    // silently fail — we don't want logging errors to crash the pipeline
+    // silently fail -- we don't want logging errors to crash the pipeline
   }
 };

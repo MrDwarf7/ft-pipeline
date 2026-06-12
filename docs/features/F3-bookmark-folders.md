@@ -53,6 +53,7 @@ Add to `commands/migrate.ts` or create a new migration.
 If porting during F0:
 
 - Add folder methods to `ConnectedSource` interface:
+
   ```typescript
   // src/extraction/index.ts
   export interface ConnectedSource {
@@ -62,6 +63,7 @@ If porting during F0:
     ...
   }
   ```
+
 - Implement in `src/extraction/graphql.ts`
 - New DB tables created before use
 
@@ -73,6 +75,7 @@ After F0 is done:
 
 - Create `src/extraction/graphql-folders.ts` (or add to `graphql.ts`)
 - Add folder sync to `commands/sync.ts`:
+
   ```typescript
   // Inside runSync():
   if (options.folders) {
@@ -80,6 +83,7 @@ After F0 is done:
     // Store folders, tag bookmarks
   }
   ```
+
 - New CLI flags: `--folders`, `--folder <name>` (add to `types.ts`)
 
 **Pros**: Cleaner separation, F0 stays focused. **Cons**: Two refactors of `graphql.ts` / `sync.ts`.

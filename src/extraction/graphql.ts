@@ -1,7 +1,4 @@
-// graphql.ts -- Clean GraphQL client for X bookmarks API
-// Pattern: check() → fetch → process (type-state enforced)
-// Uses Deno std pooledMap for concurrent processing
-// Matches fieldtheory-cli's request format: GET + URLSearchParams
+/** GraphQL client for X bookmarks API. GET + URLSearchParams, matches fieldtheory-cli. */
 
 import type { TweetData } from "./types.ts";
 import { pooledMap } from "@std/async/pool";
@@ -14,7 +11,6 @@ import type {
 import { TweetDataSchema } from "./schema.ts";
 import { logger } from "./../utils/logger.ts";
 
-// ── Hard-coded constants ──────────────────────────────────
 const BOOKMARKS_QUERY_ID = "Z9GWmP0kP2dajyckAaDUBw";
 const BOOKMARKS_OPERATION = "Bookmarks";
 const X_PUBLIC_BEARER =
@@ -45,7 +41,6 @@ const GRAPHQL_FEATURES = {
   responsive_web_media_download_video_enabled: false,
 };
 
-// ── Pure builders (matches fieldtheory-cli exactly) ────────
 const buildUrl = (cursor: string | undefined, count: number): string => {
   const variables: Record<string, unknown> = { count };
   if (cursor) variables.cursor = cursor;
@@ -70,12 +65,11 @@ const buildHeaders = (
   cookie: cookieHeader ?? `ct0=${csrfToken}`,
 });
 
-// ── Validation (GET check on base URL) ────────────────────
 const validateConnectivity = async (
   url: string,
   headers: Record<string, string>,
 ): Promise<void> => {
-  // Don't use HEAD — X's GraphQL endpoint rejects it with 405
+  // Don't use HEAD -- X's GraphQL endpoint rejects it with 405
   const resp = await fetch(url, { headers });
 
   // Check for stale-auth response (200 with errors but no data)
@@ -93,7 +87,7 @@ const validateConnectivity = async (
       }
     } catch (err) {
       if (err instanceof SyntaxError) {
-        // Not JSON — body might be HTML error page, just check status
+        // Not JSON -- body might be HTML error page, just check status
       } else {
         throw err; // rethrow our parsed auth error
       }
@@ -103,10 +97,8 @@ const validateConnectivity = async (
   if (!resp.ok) throw new Error(`GraphQL API unreachable: ${resp.status}`);
 };
 
-// ── Jitter: random delay between requests ───────────────────
 const jitter = (): Promise<void> => new Promise((r) => setTimeout(r, 500 + Math.random() * 1000));
 
-// ── Response parsing (uses zod safeParse) ───────────────────
 const parseTweet = (tweetResult: Record<string, unknown>): TweetData | null => {
   const result = TweetDataSchema.safeParse(tweetResult);
   if (!result.success) return null;
@@ -171,7 +163,7 @@ const parseResponse = (
       throw new Error(`X API returned errors: ${msgs}`);
     }
     throw new Error(
-      `X API response missing .data — unexpected structure. Keys: ${Object.keys(json).join(", ")}`,
+      `X API response missing .data -- unexpected structure. Keys: ${Object.keys(json).join(", ")}`,
     );
   }
 
@@ -180,7 +172,7 @@ const parseResponse = (
     | undefined;
   if (!bookmarkTimeline) {
     throw new Error(
-      `X API response missing .data.bookmark_timeline_v2 — keys: ${Object.keys(data).join(", ")}`,
+      `X API response missing .data.bookmark_timeline_v2 -- keys: ${Object.keys(data).join(", ")}`,
     );
   }
   const timeline = bookmarkTimeline?.timeline as Record<string, unknown>;
@@ -229,11 +221,8 @@ const parseResponse = (
 
       if (!tweetResult) return null;
 
-      // Handle BOTH tweet result formats from X API:
-      //   Old: { __typename:"Tweet", limitedActionResults, tweet: { legacy, core, ... } }
-      //   New (current): { __typename:"Tweet", legacy, core, note_tweet, ... } — flat format
-      // The Zod schema expects { tweet: { legacy, core, ... } }, so for the flat format
-      // we wrap it to match. This way parseTweet works unchanged.
+      /* X API returns both old (nested) and new (flat) tweet formats.
+       * Wrap flat format so parseTweet works unchanged. */
       const tweetData = (tweetResult as Record<string, unknown>).tweet
         ? tweetResult // old format: already has tweet wrapper
         : { tweet: tweetResult }; // flat format: wrap it
@@ -246,7 +235,6 @@ const parseResponse = (
   return { records: processedEntries, nextCursor };
 };
 
-// ── Fetch page (GET, matches fieldtheory-cli) ────────────────
 const fetchPage = async (
   config: GraphQLConfig,
   cursor: string | undefined,
@@ -283,8 +271,7 @@ const fetchPage = async (
   return parseResponse(json);
 };
 
-// ── Recursive fetch all pages (avoids no-await-in-loop) ─────
-// Staleness: stops after 2 pages with 0 new tweets
+/** Recursive fetch all pages. Stops after 2 stale pages (0 new tweets). */
 const fetchAllPages = async (
   config: GraphQLConfig,
   limit: number,
@@ -312,7 +299,7 @@ const fetchAllPages = async (
     );
   } else if (existingInPage === records.length) {
     logger.info(
-      `[sync] page: ${records.length} records, all already in DB — caught up`,
+      `[sync] page: ${records.length} records, all already in DB -- caught up`,
     );
   } else if (existingInPage > 0) {
     logger.info(
@@ -346,14 +333,12 @@ const fetchAllPages = async (
   );
 };
 
-// ── Helper: chunk array ─────────────────────────────────────
 const chunk = <T>(arr: T[], size: number): T[][] =>
   Array.from(
     { length: Math.ceil(arr.length / size) },
     (_, i) => arr.slice(i * size, (i + 1) * size),
   );
 
-// ── Public API ────────────────────────────────────────────────
 export interface GraphQLConfig {
   csrfToken: string;
   cookieHeader?: string;
@@ -381,7 +366,6 @@ export const createGraphQL = (): UncheckedSource<GraphQLConfig> => ({
   },
 });
 
-// ── Fetch implementations ────────────────────────────────────
 const fetchBatchImpl = async (
   config: GraphQLConfig,
   limit: number,

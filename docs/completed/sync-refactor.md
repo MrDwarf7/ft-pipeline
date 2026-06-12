@@ -25,7 +25,9 @@ Now supports `FT_CLI_DIR` env var override with fallback to the original hardcod
 ### 2. New Helper (`src/utils/ft-cli.ts`)
 
 ```typescript
-export const runFtCommand = async (args: string[]): Promise<Deno.CommandOutput> => {
+export const runFtCommand = async (
+  args: string[],
+): Promise<Deno.CommandOutput> => {
   return await new Deno.Command("pnpm", {
     args,
     cwd: CONFIG.ftCliDir,

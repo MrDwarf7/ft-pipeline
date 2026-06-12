@@ -1,19 +1,8 @@
-// commands/generate.ts -- Generate individual bookmark markdown files from pipeline.db
-//
-// Flow:
-//   1. Fetch ALL classified bookmark data from pipeline.db (one query)
-//   2. Sort / organize (no DB, no network)
-//   3. Pass each bookmark through a pure template closure (string interpolation only)
-//   4. Batch-write rendered files to output/bookmarks/
-//
-// The template closure is intentionally stateless — NO DB calls, NO network,
-// NO LLM. All compute happens before the template is called so it stays fast.
+/** Generate bookmark .md files from pipeline.db */
 
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
-
-// ── Data shape coming out of the DB ──
 
 interface BookmarkData {
   tweet_id: string;
@@ -31,8 +20,6 @@ interface BookmarkData {
   content_type: string;
   media_count: number;
 }
-
-// ── Pure helpers ──
 
 const slugify = (text: string, maxLen = 60): string =>
   text
@@ -63,9 +50,7 @@ const safeJsonArr = (raw: string | null): string[] => {
   }
 };
 
-// ── Template closure (PURE — no I/O, no DB, no network) ──
-// The only thing this does is string templating. Fast, stateless.
-
+/** Pure template -- no I/O, no DB, no network. String interpolation only. */
 type BookmarkTemplate = (data: BookmarkData) => string;
 
 const bookmarkTemplate: BookmarkTemplate = (b) => {
@@ -111,7 +96,7 @@ const bookmarkTemplate: BookmarkTemplate = (b) => {
     typeLinks.length > 1 ? `- **All types:** ${typeLinks.join(", ")}` : "",
     domainLinks.length > 1 ? `- **All domains:** ${domainLinks.join(", ")}` : "",
     "",
-    // Related section — cross-links to other things in the same space
+    // Related section -- cross-links to other things in the same space
     "## See Also",
     `- [[categories/${b.primary_type || "unclassified"}]] — more "${b.primary_type}" bookmarks`,
     `- [[entities/${b.author_handle}]] — more by @${b.author_handle}`,
@@ -122,15 +107,11 @@ const bookmarkTemplate: BookmarkTemplate = (b) => {
     .join("\n");
 };
 
-// ── Filename builder ──
-
 const buildFilename = (b: BookmarkData): string => {
   const { yyyy, mm, dd, day } = toDateParts(b.posted_at);
   const slug = slugify(b.display_text.slice(0, 80));
   return `${yyyy}_${mm}_${dd}-${day}-${b.author_handle}-${slug}.md`;
 };
-
-// ── DB fetch — grab everything in one shot ──
 
 const fetchAllBookmarks = (): BookmarkData[] => {
   const db = getPipelineDb();
@@ -174,8 +155,6 @@ const fetchAllBookmarks = (): BookmarkData[] => {
   }));
 };
 
-// ── Batch file writer — writes in concurrency-limited chunks ──
-
 const BATCH_SIZE = 50;
 
 interface FileToWrite {
@@ -209,23 +188,21 @@ const scanExistingFilenames = async (dir: string): Promise<Set<string>> => {
     );
     return new Set(entries.map((e) => e.name));
   } catch {
-    // Directory doesn't exist yet — nothing to skip
+    // Directory doesn't exist yet -- nothing to skip
     return new Set();
   }
 };
 
-// ── Main ──
-
 export const runGenerate = async (): Promise<void> => {
   logger.info(
-    "generate started — reading classified bookmarks from pipeline.db",
+    "generate started -- reading classified bookmarks from pipeline.db",
   );
 
   const bookmarks = fetchAllBookmarks();
   logger.info("fetched bookmarks for rendering", { count: bookmarks.length });
 
   if (bookmarks.length === 0) {
-    logger.warn("no bookmarks in pipeline.db — nothing to generate");
+    logger.warn("no bookmarks in pipeline.db -- nothing to generate");
     closePipelineDb();
     return;
   }
@@ -241,7 +218,7 @@ export const runGenerate = async (): Promise<void> => {
   // Build filenames for all bookmarks and filter to only missing ones
   const allFiles: FileToWrite[] = bookmarks.map((b) => ({
     filename: buildFilename(b),
-    content: bookmarkTemplate(b), // template closure — pure, no I/O
+    content: bookmarkTemplate(b), // template closure -- pure, no I/O
   }));
 
   const toWrite = allFiles.filter((f) => !existingFiles.has(f.filename));
@@ -255,7 +232,7 @@ export const runGenerate = async (): Promise<void> => {
   }
 
   if (toWrite.length === 0) {
-    logger.info("all bookmark files already up to date — nothing to write");
+    logger.info("all bookmark files already up to date -- nothing to write");
     closePipelineDb();
     return;
   }

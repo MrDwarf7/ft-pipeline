@@ -1,13 +1,4 @@
-// llm/index.ts -- LLM provider interface + factory
-//
-// State model:
-//   LLMProvider  ──check()──▶  ConnectedLLM
-//                                  ├── chat()
-//                                  ├── modelName()
-//                                  └── label()
-//
-// You cannot call chat() without going through check() first.
-// The type system enforces this.
+/** LLM provider interface + factory. Type-state pattern: check() returns ConnectedLLM. */
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant";

@@ -62,7 +62,10 @@ type: domain-index
 ${bookmarks.map((b) => `- [[${b.tweetId}]] ${b.title}`).join("\n")}
 `;
 
-export const generateCategoryPage = (category: string, bookmarks: BookmarkData[]) =>
+export const generateCategoryPage = (
+  category: string,
+  bookmarks: BookmarkData[],
+) =>
   `---
 title: ${category}
 type: category-index
@@ -156,7 +159,7 @@ export const runGenerate = async (): Promise<void> => {
   logger.info("generate started — using native templates + llm");
 
   const db = new Database(CONFIG.pipelineDbPath);
-  
+
   // 1. Read bookmarks from our DB (using our columns)
   const rows = db.prepare(`
     SELECT tweet_id, url, text, author_handle, author_name, posted_at,

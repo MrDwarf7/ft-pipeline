@@ -32,7 +32,7 @@ export const runMigrate = (): void => {
     db.exec("ALTER TABLE bookmarks ADD COLUMN extract_status TEXT");
   }
 
-  // Main bookmarks table — everything we need, nothing we don't
+  // Main bookmarks table -- everything we need, nothing we don't
   db.exec(`
     CREATE TABLE IF NOT EXISTS bookmarks (
       tweet_id          TEXT PRIMARY KEY,
@@ -78,7 +78,7 @@ export const runMigrate = (): void => {
     `CREATE INDEX IF NOT EXISTS idx_bookmarks_clipping_path ON bookmarks(clipping_path)`,
   );
 
-  // Migration runs table — track what we've done
+  // Migration runs table -- track what we've done
   db.exec(`
     CREATE TABLE IF NOT EXISTS migration_runs (
       id        INTEGER PRIMARY KEY AUTOINCREMENT,

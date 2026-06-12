@@ -1,9 +1,4 @@
-// commands/merge.ts -- Merge Clippings enriched text back into DB
-//
-// Reads .md files from Clippings/{X-Articles, X-Posts, X-Media}/,
-// extracts frontmatter tweet_id + body text, matches against bookmarks,
-// and writes clippings_text (capped at 5000 chars) + clippings_type + timestamp.
-// Priority: articles > posts > media (richest content wins).
+/** Merge Clippings enriched text back into DB */
 
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
@@ -58,7 +53,7 @@ const readClippings = async (): Promise<Map<string, ClippingEntry>> => {
         }
         return null;
       } catch (err) {
-        // Dir doesn't exist — skip silently
+        // Dir doesn't exist -- skip silently
         if (err instanceof Deno.errors.NotFound) return null;
         logger.warn("failed to read clippings dir", {
           dir: CONFIG.clippingsBase,
@@ -80,7 +75,7 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
   logger.info("read clippings", { count: clippings.size });
 
   if (clippings.size === 0) {
-    logger.info("no clippings found — nothing to merge");
+    logger.info("no clippings found -- nothing to merge");
     return;
   }
 
@@ -90,7 +85,7 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
       (acc, c) => ({ ...acc, [c.type]: (acc[c.type] || 0) + 1 }),
       {} as Record<string, number>,
     );
-    logger.info("dry run — merge preview", {
+    logger.info("dry run -- merge preview", {
       total: clippings.size,
       byType: typeCounts,
     });

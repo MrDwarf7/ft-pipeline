@@ -24,29 +24,28 @@
 
 ```typescript
 // config.ts
-export const MEDIA_DIR = Deno.env.get("FT_MEDIA_DIR") ??
-  `${BASES.dataDir}/media`;
+export const MEDIA_DIR = Deno.env.get("FT_MEDIA_DIR") ?? `${BASES.dataDir}/media`;
 export const MEDIA_MAX_BYTES = parseInt(
   Deno.env.get("FT_MEDIA_MAX_BYTES") ?? "209715200", // 200MB
 );
 ```
 
-2. **Media Types to Handle**:
+1. **Media Types to Handle**:
    - Direct tweet media: `tweet.media.all` (photo, video, animated_gif)
    - Article images: `article.cover_media` + `article.media_entities` (currently missing — B4 fix)
    - Profile images: author profile pics (optional skip)
 
-3. **New Command**: `commands/fetch-media.ts`
+2. **New Command**: `commands/fetch-media.ts`
    - `deno task fetch-media` → backfill all missing media
    - `deno task fetch-media --skip-profile-images`
    - Manifest tracking: `media-manifest.json` in media dir (track downloaded assets)
 
-4. **Integration with Sync**:
+3. **Integration with Sync**:
    - Add flags to `types.ts` Command.Sync: `--no-media`, `--media-max-bytes`,
      `--skip-profile-images`
    - Run media fetch after sync (same as ft-cli)
 
-5. **Storage Path (Critical)**:
+4. **Storage Path (Critical)**:
    - User requirement: configurable because "media can get large"
    - Env var: `FT_MEDIA_DIR` (absolute path)
    - Fallback: `BASES.dataDir + '/media'`

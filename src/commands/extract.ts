@@ -146,7 +146,7 @@ const queryRows = (db: Database, limit?: number): Row[] =>
     .all<Row>();
 
 const dryRunPreview = (rows: Row[]) => {
-  logger.info("dry run — showing first 5 bookmarks to extract", {
+  logger.info("dry run -- showing first 5 bookmarks to extract", {
     total: rows.length,
   });
   rows.slice(0, 5).forEach((row) =>
@@ -293,7 +293,7 @@ const buildMediaList = (
       .filter((x): x is string => x !== null),
   );
 
-  // Article images (cover + inline) — dedup against already-added media
+  // Article images (cover + inline) -- dedup against already-added media
   lines.push(
     ...articleImages
       .filter((url) => !lines.some((l) => l.includes(url)))
@@ -351,7 +351,7 @@ const extractArticleText = (article: unknown): string => {
     .join("\n\n");
 };
 
-/** Concatenate tweet text + article text — either can be empty, both get captured if present */
+/** Concatenate tweet text + article text -- either can be empty, both get captured if present */
 const getEffectiveText = (tweet: XtracticleResponse["tweets"][0]): string =>
   [tweet.text, extractArticleText(tweet.article)].filter(Boolean).join("\n\n");
 
@@ -426,7 +426,7 @@ const extractSingle = async (
   const tweet = data.tweets[0];
   const effectiveText = getEffectiveText(tweet);
   if (!effectiveText || effectiveText.trim().length === 0) {
-    logger.info("xtracticle returned empty text — skipping", {
+    logger.info("xtracticle returned empty text -- skipping", {
       tweet_id: row.tweet_id,
       url: tweet.url,
     });

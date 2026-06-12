@@ -48,14 +48,17 @@ const buildUrl = (cursor?: string, count = 20): string => {
   return `https://x.com/i/api/graphql/${BOOKMARKS_QUERY_ID}/Bookmarks?variables=${variables}&features=${features}`;
 };
 
-const buildHeaders = (csrfToken: string, cookieHeader?: string): Record<string, string> => ({
-  "authorization": `Bearer ${X_PUBLIC_BEARER}`,
+const buildHeaders = (
+  csrfToken: string,
+  cookieHeader?: string,
+): Record<string, string> => ({
+  authorization: `Bearer ${X_PUBLIC_BEARER}`,
   "x-csrf-token": csrfToken,
   "x-twitter-auth-type": "OAuth2Session",
   "x-twitter-active-user": "yes",
   "content-type": "application/json",
   "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 ...",
-  "cookie": cookieHeader ?? `ct0=${csrfToken}`,
+  cookie: cookieHeader ?? `ct0=${csrfToken}`,
 });
 ```
 

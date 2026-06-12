@@ -36,18 +36,18 @@ CREATE TABLE bookmark_folder_tags (
 );
 ```
 
-2. **Sync Integration**: Add to existing `commands/sync.ts`
+1. **Sync Integration**: Add to existing `commands/sync.ts`
    - New flags: `--folders`, `--folder <name>` to `types.ts` Command.Sync
    - Folder sync runs after main GraphQL timeline sync (match ft-cli behavior)
    - Reuse existing cookie logic from `cookies.ts`
 
-3. **CLI Commands**:
+2. **CLI Commands**:
    - `deno task sync --folders` → sync all folders
    - `deno task sync --folder "Coding"` → sync single folder
    - Add `Command.List` filter by folder (read from DB)
    - Add `Command.Folders` to show distribution
 
-4. **Config**: No new env vars (uses existing `FT_COOKIES_PATH`)
+3. **Config**: No new env vars (uses existing `FT_COOKIES_PATH`)
 
 ## Conventions
 

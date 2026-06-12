@@ -1,7 +1,4 @@
-// utils/env.ts -- Required environment variable checker + .env loader
-//
-// loadDotEnv runs once at module load time, ensuring .env is loaded before
-// CONFIG (in config.ts) is evaluated. assertEnvVars then just checks vars.
+/** Required env var checker + .env loader. Loads .env at module init before CONFIG. */
 
 import * as path from "@std/path";
 
@@ -44,11 +41,11 @@ const loadDotEnv = (): void => {
     Object.entries(vars).forEach(([k, v]) => Deno.env.set(k, v));
     dotenvLoaded = true;
   } catch {
-    // No .env file — vars must come from the actual environment
+    // No .env file -- vars must come from the actual environment
   }
 };
 
-// Load .env at module load time — before CONFIG is evaluated
+// Load .env at module load time -- before CONFIG is evaluated
 loadDotEnv();
 
 export const assertEnvVars = (required: string[]): void => {

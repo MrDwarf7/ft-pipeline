@@ -24,7 +24,7 @@ export const queryUnclassified = (db: Database, limit?: number): Row[] =>
     .all<Row>();
 
 export const dryRunPreview = (rows: Row[]) => {
-  logger.info("dry run — showing first 5 unclassified bookmarks", {
+  logger.info("dry run -- showing first 5 unclassified bookmarks", {
     total: rows.length,
   });
   rows.slice(0, 5).forEach((row) =>

@@ -1,19 +1,13 @@
-// config.ts -- All paths and settings in one place
-// Single import point for the entire app
+/** All paths and settings in one place */
 
 import { BASES } from "./utils/bases.ts";
 
 const envOrFallback = (key: string, fallback: string): string => Deno.env.get(key) ?? fallback;
 
 export const CONFIG = {
-  // Pipeline DB — our canonical database (hardcoded, see bases.ts)
   pipelineDbPath: envOrFallback("FT_PIPELINE_DB_PATH", BASES.pipelineDbPath),
 
-  // Cookies file — MUST be an absolute path.
-  // Set FT_COOKIES_PATH to override the default.
-  //
-  //   export FT_COOKIES_PATH="/home/dwarf/.config/ft-pipeline/.sync-cookies.enc"
-  //
+  /** Set FT_COOKIES_PATH to override. Must be absolute. */
   cookiesPath: envOrFallback("FT_COOKIES_PATH", BASES.cookiesPath),
 
   // Output directory for generated markdown files (bookmarks, indexes, etc.)
@@ -54,14 +48,7 @@ export const CONFIG = {
   } as const,
 } as const;
 
-// ── Retired config keys ──────────────────────────────────────────────
-// These were previously used when the pipeline read from the old
-// fieldtheory-cli database (.ft-bookmarks/).  They are no longer needed.
-//
-//   ftDbPath:          envOrFallback("FT_DB_PATH",         BASES.ftDbPath)
-//   bookmarksJsonl:    BASES.bookmarksJsonl
-//   ftCliDir:          envOrFallback("FT_CLI_DIR",         BASES.ftCliDir)
-// -------------------------------------------------------------------
+/* Retired: ftDbPath, bookmarksJsonl, ftCliDir -- from old fieldtheory-cli DB */
 
 // Taxonomy for classification
 export const TYPES = [

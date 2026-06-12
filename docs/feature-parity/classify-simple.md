@@ -38,16 +38,16 @@ export const LLM_ENDPOINTS = {
 };
 ```
 
-2. **CLI**: Just pass `--endpoint openai|anthropic|local` (not complex engine names)
+1. **CLI**: Just pass `--endpoint openai|anthropic|local` (not complex engine names)
    - Add to `types.ts` Command.Classify
    - Default: `local` (llama-server)
 
-3. **Fix B2/B3 first**:
+2. **Fix B2/B3 first**:
    - Write to our `primary_type`/`primary_domain` columns
    - Add system prompt for classification
    - Use `clippings_text` when available
 
-4. **No regex fallback needed?** (you didn't mention it — ft-cli has `ft classify --regex`)
+3. **No regex fallback needed?** (you didn't mention it — ft-cli has `ft classify --regex`)
 
 ## Conventions
 

@@ -14,7 +14,7 @@ import { pipeline, runFull } from "./utils/pipeline.ts";
 import { checkCookies, runCookieExtract } from "./commands/cookies.ts";
 import { logger } from "./utils/logger.ts";
 
-// Commands that need cookies + password — check env up front
+// Commands that need cookies + password -- check env up front
 const REQUIRES_COOKIES: Set<Command> = new Set([Command.Sync, Command.Full]);
 
 const main = async () => {
