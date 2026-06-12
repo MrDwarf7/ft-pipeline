@@ -13,9 +13,36 @@ import { printHelp } from "./commands/help.ts";
 import { pipeline, runFull } from "./utils/pipeline.ts";
 import { checkCookies, runCookieExtract } from "./commands/cookies.ts";
 import { logger } from "./utils/logger.ts";
+import { CONFIG } from "./config.ts";
 
 // Commands that need cookies + password -- check env up front
 const REQUIRES_COOKIES: Set<Command> = new Set([Command.Sync, Command.Full]);
+
+const cleanupLogs = (): void => {
+  if (Deno.env.get("FT_NO_HOUSEKEEPING") === "1") return;
+
+  const logDir = CONFIG.logDir;
+  const maxFiles = CONFIG.maxLogFiles;
+  try {
+    const files = [...Deno.readDirSync(logDir)]
+      .filter((f) => f.name.endsWith(".log"))
+      .map((f) => f.name)
+      .sort();
+
+    if (files.length <= maxFiles) return;
+
+    const toDelete = files.slice(0, files.length - maxFiles);
+    for (const name of toDelete) {
+      Deno.removeSync(`${logDir}/${name}`);
+    }
+    logger.info("log housekeeping", {
+      deleted: toDelete.length,
+      kept: files.length - toDelete.length,
+    });
+  } catch {
+    // dir missing or read error -- not our problem
+  }
+};
 
 const main = async () => {
   const args = parseCliArgs();
@@ -25,6 +52,8 @@ const main = async () => {
 
   const command = commandArg as Command;
   const subcommand = args._[1] ? String(args._[1]) : undefined;
+
+  cleanupLogs();
 
   // Check required env vars before doing anything
   if (REQUIRES_COOKIES.has(command)) {

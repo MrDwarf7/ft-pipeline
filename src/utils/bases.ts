@@ -80,12 +80,12 @@ export const BASES = Object.freeze({
   // Pipeline logs
   logDir: `${appConfigDir}/logs`,
 
- // StoneVault is the actual vault location (symlinked from external drive).
+  // StoneVault is the actual vault location (symlinked from external drive).
   // ~/wiki -> StoneVault/wiki.
   clippingsBase: `${homeDir}/StoneVault/Clippings`,
 
   // Static API endpoints
   xtracticleBase: "https://xtracticle.com/api/thread",
   llmBase: "http://localhost:1234/v1",
-  llmModel: "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
+  llmModel: Deno.env.get("FT_LLM_MODEL") ?? "gemma",
 });

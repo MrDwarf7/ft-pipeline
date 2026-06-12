@@ -107,7 +107,7 @@ export const runFull = async (args: Args) => {
             lower.includes("econnrefused")
           ) {
             hint = stepName === "Classify"
-              ? "LLM server not running at localhost:1234. Start with: LD_LIBRARY_PATH=/opt/llama-cpp/lib /opt/llama-cpp/bin/llama-server -m <model.gguf> --port 1234"
+              ? "LLM server not running at localhost:1234. Start with: uv run python -m src.main --router"
               : "Connection refused -- check the target service is running";
           } else if (
             lower.includes("connect") ||

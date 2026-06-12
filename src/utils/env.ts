@@ -8,9 +8,11 @@ export const envOrFallback = (key: string, fallback: string): string =>
 const getEnvHome = (): string => {
   const ftHome = Deno.env.get("FT_PIPELINE_HOME");
   if (ftHome) return ftHome;
-
   const appEnv = Deno.env.get("FT_APP_ENV")?.toUpperCase();
-  return appEnv === "PROD" ? path.dirname(Deno.execPath()) : Deno.cwd();
+  if (appEnv === "PROD") return path.dirname(Deno.execPath());
+
+  const xdgConfig = Deno.env.get("XDG_CONFIG_HOME") ?? `${Deno.env.get("HOME") ?? "~"}/.config`;
+  return `${xdgConfig}/ft-pipeline`;
 };
 
 const parseEnvFile = (content: string): Record<string, string> =>

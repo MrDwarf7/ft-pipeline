@@ -29,6 +29,9 @@ export const CONFIG = {
   llmBase: BASES.llmBase,
   llmModel: BASES.llmModel,
 
+  // Log housekeeping -- cap on log files in logDir
+  maxLogFiles: Number(Deno.env.get("FT_MAX_LOG_FILES")) || 100,
+
   // Timing
   syncDelayMs: 600,
   extractDelayMs: 750,
