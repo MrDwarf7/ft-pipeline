@@ -23,8 +23,13 @@
     "jsr:@std/path@1": "1.1.5",
     "jsr:@std/path@1.0": "1.0.9",
     "jsr:@std/path@^1.1.5": "1.1.5",
+    "npm:env-paths@*": "4.0.0",
+    "npm:env-paths@4": "4.0.0",
     "npm:sql.js@*": "1.14.1",
     "npm:sql.js@1.14.1": "1.14.1",
+    "npm:xdg-basedir@*": "5.1.0",
+    "npm:xdg-basedir@5": "5.1.0",
+    "npm:xdg-basedir@^5.1.0": "5.1.0",
     "npm:zod@^4.4.3": "4.4.3"
   },
   "jsr": {
@@ -113,8 +118,20 @@
     }
   },
   "npm": {
+    "env-paths@4.0.0": {
+      "integrity": "sha512-pxP8eL2SwwaTRi/KHYwLYXinDs7gL3jxFcBYmEdYfZmZXbaVDvdppd0XBU8qVz03rDfKZMXg1omHCbsJjZrMsw==",
+      "dependencies": [
+        "is-safe-filename"
+      ]
+    },
+    "is-safe-filename@0.1.1": {
+      "integrity": "sha512-4SrR7AdnY11LHfDKTZY1u6Ga3RuxZdl3YKWWShO5iyuG5h8QS4GD2tOb04peBJ5I7pXbR+CGBNEhTcwK+FzN3g=="
+    },
     "sql.js@1.14.1": {
       "integrity": "sha512-gcj8zBWU5cFsi9WUP+4bFNXAyF1iRpA3LLyS/DP5xlrNzGmPIizUeBggKa8DbDwdqaKwUcTEnChtd2grWo/x/A=="
+    },
+    "xdg-basedir@5.1.0": {
+      "integrity": "sha512-GCPAHLvrIH13+c0SuacwvRYj2SxJXQ4kaVTT5xgL3kPrz56XxkF21IGhjSE1+W0aw7gpBWRGXLCPnPby6lSpmQ=="
     },
     "zod@4.4.3": {
       "integrity": "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="
@@ -241,6 +258,8 @@
       "jsr:@std/io@~0.225.3",
       "jsr:@std/log@0.224",
       "jsr:@std/path@1",
+      "npm:env-paths@4",
+      "npm:xdg-basedir@^5.1.0",
       "npm:zod@^4.4.3"
     ]
   }
