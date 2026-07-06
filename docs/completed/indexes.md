@@ -1,6 +1,6 @@
-# INDEXES Step — Complete
+# INDEXES Step -- Complete
 
-**Date completed:** 2026-05-05 **Status:** ✅ Fully implemented
+**Date completed:** 2026-05-05 **Status:** Fully implemented
 
 ## What Was Done
 
@@ -9,15 +9,15 @@ category pages, domain pages, entity (author) pages, and a master index.
 
 ## Implementation
 
-**File:** `commands/indexes.ts`
+**File:** `src/commands/indexes.ts`
 
 ## Generated Pages
 
-All output goes to `CONFIG.mdOutputDir` (`~/.ft-bookmarks/md/`):
+All output goes to `CONFIG.mdOutputDir` (`~/StoneVault/wiki/`):
 
 ### Category Pages
 
-`md/categories/{type}.md` — bookmarks grouped by primary_type
+`wiki/categories/{type}.md` -- bookmarks grouped by primary_type
 
 - Bookmark listings (top by engagement, recent)
 - Related domains cross-links
@@ -25,7 +25,7 @@ All output goes to `CONFIG.mdOutputDir` (`~/.ft-bookmarks/md/`):
 
 ### Domain Pages
 
-`md/domains/{domain}.md` — bookmarks grouped by primary_domain
+`wiki/domains/{domain}.md` -- bookmarks grouped by primary_domain
 
 - Bookmark listings (top by engagement, recent)
 - Related categories cross-links
@@ -33,7 +33,7 @@ All output goes to `CONFIG.mdOutputDir` (`~/.ft-bookmarks/md/`):
 
 ### Entity Pages
 
-`md/entities/{handle}.md` — author pages (5+ bookmarks, configurable via `ENTITY_THRESHOLD`)
+`wiki/entities/{handle}.md` -- author pages (5+ bookmarks, configurable via `ENTITY_THRESHOLD`)
 
 - Author name, bookmark count
 - Bookmark listings (top by engagement, recent)
@@ -41,39 +41,19 @@ All output goes to `CONFIG.mdOutputDir` (`~/.ft-bookmarks/md/`):
 
 ### Master Index
 
-`md/index.md` — overview with counts
+`wiki/index.md` -- top-level index
 
-- Total bookmark count
-- Links to all categories with counts
-- Links to all domains with counts
-- Top entities (by bookmark count, capped at 50)
+- By category (counts per type)
+- By domain (counts per domain)
+- Top entities (50 most prolific authors)
 
-## Cross-Links
+## Hash-Based Caching
 
-All pages use Obsidian wiki-links:
+Uses SHA-256 hash comparison before writing (see `src/utils/hash.ts`). Only writes files when
+content has changed, reducing I/O on subsequent runs.
 
-- `[[categories/{type}]]`
-- `[[domains/{domain}]]`
-- `[[entities/{handle}]]`
-- Links to original tweets: `https://x.com/i/status/{tweet_id}`
-
-## API / Usage
+## Usage
 
 ```bash
-deno task start indexes              # Generate all index pages
-deno task full                       # Includes indexes (runs last)
+deno task indexes              # Generate all index pages
 ```
-
-## Schema
-
-Reads from pipeline.db `bookmarks` table:
-
-- `primary_type`, `primary_domain` — for grouping
-- `clippings_text` — fallback for `display_text` in listings
-- `author_handle`, `author_name` — for entity pages
-
-## Notes
-
-- Uses `display_text` with `clippings_text` fallback for richer summaries
-- Configurable `ENTITY_THRESHOLD` (default: 5 bookmarks for entity pages)
-- All pages include frontmatter (type, category/domain, count, updated timestamp)

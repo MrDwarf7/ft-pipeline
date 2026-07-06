@@ -51,23 +51,25 @@ Paths follow XDG Base Directory spec on Linux, OS-native conventions on macOS/Wi
 
 ## Fix Specs
 
-See [`_fixes/`](../_fixes/) for detailed fix specifications:
+See `docs/_fixes/` for detailed fix specifications:
 
 - `B1-merge-step-missing.md` -- DONE
 - `B2-classify-wrong-columns.md` -- DONE
 - `B3-classify-prompt-incomplete.md` -- DONE
 - `B4-extract-article-images.md` -- OPEN (article images not captured)
 - `B5-indexes-wrong-columns.md` -- DONE
+- `B6-qwen-thinking-breaks-classify.md` -- DONE
 
 ## Project Files
 
-| File                                    | Description                                   |
-| --------------------------------------- | --------------------------------------------- |
-| [`TODO.md`](../TODO.md)                 | Active TODO list                              |
-| [`AGENTS.md`](../AGENTS.md)             | Project structure, conventions, doc standards |
-| [`src/config.ts`](../src/config.ts)     | Paths, thresholds, taxonomy                   |
-| [`src/main.ts`](../src/main.ts)         | CLI entry point                               |
-| [`src/pipeline.ts`](../src/pipeline.ts) | Pipeline orchestration                        |
-| [`src/commands/`](../src/commands/)     | Pipeline step implementations                 |
-| [`src/utils/`](../src/utils/)           | Shared utilities                              |
-| [`src/llm/`](../src/llm/)               | LLM client abstraction                        |
+| File                                                | Description                                   |
+| --------------------------------------------------- | --------------------------------------------- |
+| [`TODO.md`](../TODO.md)                             | Active TODO list                              |
+| [`AGENTS.md`](../AGENTS.md)                         | Project structure, conventions, doc standards |
+| [`src/config.ts`](../src/config.ts)                 | Paths, thresholds, taxonomy                   |
+| [`src/main.ts`](../src/main.ts)                     | CLI entry point                               |
+| [`src/utils/pipeline.ts`](../src/utils/pipeline.ts) | Pipeline orchestration                        |
+| [`src/commands/`](../src/commands/)                 | Pipeline step implementations                 |
+| [`src/utils/`](../src/utils/)                       | Shared utilities                              |
+| [`src/llm/`](../src/llm/)                           | LLM client abstraction                        |
+| [`src/extraction/`](../src/extraction/)             | Extraction source interface + GraphQL client  |

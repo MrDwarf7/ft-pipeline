@@ -1,8 +1,13 @@
-# Sync & Generate Refactor — Config Extraction + FtCli Helper
+# Sync & Generate Refactor -- Historical Note
 
-**Date completed:** 2026-05-05 **Status:** ✅ Complete
+**Date:** 2026-05-05 (intermediate step)
 
-## What Was Done
+Sync and generate no longer use runFtCommand(). Current: src/extraction/graphql.ts and
+src/commands/generate.ts.
+
+---
+
+## Archived detail
 
 Refactored `sync.ts` and `generate.ts` to extract the hardcoded `ftDir` path into config and create
 a reusable helper for shelling out to pnpm commands in the fieldtheory-cli directory.

@@ -1,6 +1,6 @@
-# MERGE Step — Complete
+# MERGE Step -- Complete
 
-**Date completed:** 2026-05-05 **Status:** ✅ Fully implemented
+**Date completed:** 2026-05-05 **Status:** Fully implemented
 
 ## What Was Done
 
@@ -10,14 +10,13 @@ content instead of just tweet text.
 
 ## Implementation
 
-**File:** `commands/merge.ts`
+**File:** `src/commands/merge.ts`
 
 - Reads all `.md` files from `Clippings/{X-Articles, X-Posts, X-Media}/`
 - Parses frontmatter to extract `tweet_id`
 - Uses `extractBody()` to get the markdown body content
 - Priority: articles > posts > media (richest content wins via `TYPE_RANK`)
 - Caps `clippings_text` at 5000 chars
-- Uses SQLite transactions for bulk updates
 - Dry-run mode (`--dry-run`) shows stats without writing
 - Logs enrichment status after merge
 
@@ -34,9 +33,9 @@ Also called automatically in `deno task full` (between EXTRACT and CLASSIFY).
 
 Writes to pipeline.db `bookmarks` table:
 
-- `clippings_text` — enriched content (max 5000 chars)
-- `clippings_type` — X-Articles | X-Posts | X-Media
-- `clippings_merged_at` — ISO timestamp
+- `clippings_text` -- enriched content (max 5000 chars)
+- `clippings_type` -- X-Articles | X-Posts | X-Media
+- `clippings_merged_at` -- ISO timestamp
 
 ## Notes
 
