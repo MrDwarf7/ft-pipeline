@@ -5,42 +5,8 @@ export const hashFile = async (
   baseDir: string,
 ): Promise<string> => {
   const fullPath = path.startsWith("/") ? path : `${baseDir}/${path}`;
-  const file = await Deno.open(fullPath, { read: true });
-
-  try {
-    const crypto = globalThis.crypto;
-
-    const stat = file.statSync();
-    const size = stat?.size ?? 0;
-
-    if (size > 0) {
-      const buffer = new Uint8Array(size);
-      const CHUNK_SIZE = 65536;
-
-      // Read file in chunks -- collect promises, then await all
-      const readPromises: Promise<number | null>[] = [];
-      const chunks = Math.ceil(size / CHUNK_SIZE);
-      for (let i = 0; i < chunks; i++) {
-        const offset = i * CHUNK_SIZE;
-        const chunkSize = Math.min(CHUNK_SIZE, size - offset);
-        readPromises.push(
-          file.read(buffer.slice(offset, offset + chunkSize)),
-        );
-      }
-      await Promise.all(readPromises);
-
-      // Hash the buffer
-      const hash = await crypto.subtle.digest("SHA-256", buffer);
-
-      // Convert hash to hex string
-      const hashArray = new Uint8Array(hash);
-      return Array.from(hashArray, (b) => b.toString(16).padStart(2, "0")).join("");
-    }
-
-    return "";
-  } finally {
-    file.close();
-  }
+  const content = await Deno.readTextFile(fullPath);
+  return hashContent(content);
 };
 
 export const hashContent = async (content: string): Promise<string> => {
