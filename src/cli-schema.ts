@@ -27,19 +27,38 @@ export const COMMANDS: CommandDef[] = [
     name: "cookies extract",
     description: "Extract X session cookies (interactive)",
   },
-  { name: "cookies check", description: "Check if cookies file exists" },
-  { name: "sync", description: "Sync bookmarks from X (requires cookies)" },
+  {
+    name: "cookies check",
+    description: "Check if cookies file exists",
+  },
+  {
+    name: "sync",
+    description: "Sync bookmarks from X (requires cookies)",
+  },
   {
     name: "extract",
     description: "Extract articles via xtracticle + link to DB",
   },
-  { name: "merge", description: "Merge Clippings enriched text back into DB" },
+  {
+    name: "merge",
+    description: "Merge Clippings enriched text back into DB",
+  },
   {
     name: "classify",
     description: "LLM classification for unclassified bookmarks",
   },
-  { name: "generate", description: "Regenerate md files from DB" },
-  { name: "indexes", description: "Generate category/domain index notes" },
+  {
+    name: "generate",
+    description: "Regenerate md files from DB",
+  },
+  {
+    name: "indexes",
+    description: "Generate category/domain index notes",
+  },
+  {
+    name: "config",
+    description: "Show or edit the standalone config file",
+  },
   {
     name: "full",
     description:
@@ -54,7 +73,11 @@ export const GLOBAL_OPTIONS: OptionDef[] = [
     type: "string",
     description: "Cookie decryption password (or FT_PIPELINE_PASSWORD env)",
   },
-  { name: "limit", type: "string", description: "Limit items to process" },
+  {
+    name: "limit",
+    type: "string",
+    description: "Limit items to process",
+  },
   {
     name: "dry-run",
     type: "boolean",
@@ -67,7 +90,12 @@ export const GLOBAL_OPTIONS: OptionDef[] = [
     description: "Skip already processed items",
     default: true,
   },
-  { name: "help", alias: "h", type: "boolean", description: "Show this help" },
+  {
+    name: "help",
+    alias: "h",
+    type: "boolean",
+    description: "Show this help",
+  },
 ];
 
 export const SYNC_OPTIONS: OptionDef[] = [
