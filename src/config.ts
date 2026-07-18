@@ -1,55 +1,159 @@
-/** All paths and settings in one place */
+/** All paths and settings in one place.
+ *
+ * Configuration resolution order (highest wins):
+ *   1. FT_* environment variables (per-field overrides)
+ *   2. standalone config file at <appConfigDir>/config.jsonc
+ *   3. computed BASES defaults (XDG/env-derived)
+ *
+ * The config file is generated on first run with `CONFIG` defaults. Edit it
+ * directly, or use `ft-pipeline config set <key> <value>`. Validation runs on
+ * every load via zod, so a malformed file fails fast with the offending line.
+ */
 
+import { parse as parseJsonc } from "@std/jsonc";
+import { z } from "zod";
 import { BASES } from "./utils/bases.ts";
+import { envOrFallback } from "./utils/env.ts";
 
-const envOrFallback = (key: string, fallback: string): string => Deno.env.get(key) ?? fallback;
+const CONFIG_FILE = `${BASES.appConfigDir}/config.jsonc`;
 
-export const CONFIG = {
-  pipelineDbPath: envOrFallback("FT_PIPELINE_DB_PATH", BASES.pipelineDbPath),
+/** Pure config schema -- no paths, no code. This is the serialization contract. */
+const configSchema = z.object({
+  pipelineDbPath: z.string().min(1),
+  cookiesPath: z.string().min(1),
+  mdOutputDir: z.string().min(1),
+  clippingsBase: z.string().min(1),
+  classificationResultsPath: z.string().min(1),
+  logDir: z.string().min(1),
+  xtracticleBase: z.string().min(1),
+  llmBase: z.string().min(1),
+  llmModel: z.string().min(1),
+  maxLogFiles: z.number().int().positive(),
+  syncDelayMs: z.number().int().nonnegative(),
+  extractDelayMs: z.number().int().nonnegative(),
+  extractJitterMs: z.number().int().nonnegative(),
+  minPostTextLength: z.number().int().positive(),
+  maxRetries: z.number().int().nonnegative(),
+  retryBaseMs: z.number().int().nonnegative(),
+  classificationBatchSize: z.number().int().positive(),
+  clippingDirs: z.object({
+    articles: z.string().min(1),
+    posts: z.string().min(1),
+    media: z.string().min(1),
+  }),
+});
 
-  /** Set FT_COOKIES_PATH to override. Must be absolute. */
-  cookiesPath: envOrFallback("FT_COOKIES_PATH", BASES.cookiesPath),
+export type Config = z.infer<typeof configSchema>;
 
-  // Output directory for generated markdown files (bookmarks, indexes, etc.)
-  mdOutputDir: envOrFallback("FT_MARKDOWN_DIR", BASES.mdOutputDir),
-
-  // StoneVault clippings base dir
-  clippingsBase: envOrFallback("FT_CLIPPINGS_BASE", BASES.clippingsBase),
-
-  // Classification results backup
+/** Computed defaults -- the seed for the config file and the floor for resolution. */
+const DEFAULTS: Config = {
+  pipelineDbPath: BASES.pipelineDbPath,
+  cookiesPath: BASES.cookiesPath,
+  mdOutputDir: BASES.mdOutputDir,
+  clippingsBase: BASES.clippingsBase,
   classificationResultsPath: BASES.classificationResultsPath,
-
-  // Pipeline logs
   logDir: BASES.logDir,
-
-  // Xtracticle API
   xtracticleBase: BASES.xtracticleBase,
-
-  // LLM (llama-server local)
   llmBase: BASES.llmBase,
   llmModel: BASES.llmModel,
-
-  // Log housekeeping -- cap on log files in logDir
   maxLogFiles: Number(Deno.env.get("FT_MAX_LOG_FILES")) || 100,
-
-  // Timing
   syncDelayMs: 600,
   extractDelayMs: 750,
   extractJitterMs: 400,
-
-  // Thresholds
   minPostTextLength: 200,
   maxRetries: 3,
   retryBaseMs: 2000,
   classificationBatchSize: 50,
-
-  // Clippings subdirs
   clippingDirs: {
     articles: "X-Articles",
     posts: "X-Posts",
     media: "X-Media",
-  } as const,
-} as const;
+  },
+};
+
+const withFallback = <T>(value: T | null | undefined, fallback: T): T =>
+  value === null || value === undefined ? fallback : value;
+
+/** Override computed defaults with any values present in the standalone file. */
+const mergeFile = (file: Partial<Config> | null): Config => ({
+  ...DEFAULTS,
+  ...file,
+  clippingDirs: { ...DEFAULTS.clippingDirs, ...(file?.clippingDirs ?? {}) },
+});
+
+/** FT_* env vars are the final, highest-precedence override layer. */
+const applyEnvOverrides = (cfg: Config): Config => ({
+  ...cfg,
+  pipelineDbPath: envOrFallback("FT_PIPELINE_DB_PATH", cfg.pipelineDbPath),
+  cookiesPath: envOrFallback("FT_COOKIES_PATH", cfg.cookiesPath),
+  mdOutputDir: envOrFallback("FT_MARKDOWN_DIR", cfg.mdOutputDir),
+  clippingsBase: envOrFallback("FT_CLIPPINGS_BASE", cfg.clippingsBase),
+});
+
+const loadConfig = (): Config => {
+  let raw: string | null = null;
+  try {
+    raw = Deno.readTextFileSync(CONFIG_FILE);
+  } catch {
+    return Object.freeze(applyEnvOverrides(DEFAULTS));
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = parseJsonc(raw);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Invalid config file ${CONFIG_FILE}: ${msg}`);
+  }
+
+  const merged = mergeFile((parsed as Partial<Config>) ?? {});
+  const result = configSchema.safeParse(merged);
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
+      .join("\n");
+    throw new Error(`Invalid config values in ${CONFIG_FILE}:\n${issues}`);
+  }
+  return Object.freeze(applyEnvOverrides(result.data));
+};
+
+export const CONFIG: Config = loadConfig();
+
+/* Serialization API -- used by the `config` command.
+ * Writes the effective config (file layer merged over defaults, before env
+ * overrides) so the on-disk file is portable and explicit. */
+
+const jsoncHeader =
+  '// ft-pipeline configuration\n// Precedence: FT_* env vars > this file > built-in defaults\n// Run "ft-pipeline config show" to see effective values.\n\n';
+
+export const configFilePath = (): string => CONFIG_FILE;
+
+export const serializeConfig = (cfg: Config): string =>
+  `${jsoncHeader}${JSON.stringify(cfg, null, 2)}\n`;
+
+export const writeConfigFile = (cfg: Config): void => {
+  Deno.mkdirSync(BASES.appConfigDir, { recursive: true });
+  Deno.writeTextFileSync(CONFIG_FILE, serializeConfig(cfg));
+};
+
+export const readConfigFile = (): Config => {
+  const raw = Deno.readTextFileSync(CONFIG_FILE);
+  return configSchema.parse(mergeFile(parseJsonc(raw) as Partial<Config>));
+};
+
+export const loadConfigFileOrDefault = (): Config =>
+  withFallback(
+    (() => {
+      try {
+        return readConfigFile();
+      } catch {
+        return null;
+      }
+    })(),
+    DEFAULTS,
+  );
+
+export const writeConfigFileDefault = (): void => writeConfigFile(DEFAULTS);
 
 /* Retired: ftDbPath, bookmarksJsonl, ftCliDir -- from old fieldtheory-cli DB */
 

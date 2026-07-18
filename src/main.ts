@@ -9,9 +9,11 @@
 
 import { assertEnvVars } from "./utils/env.ts";
 import { Command, parseCliArgs } from "./types.ts";
-import { printHelp } from "./commands/help.ts";
+import { printScreen } from "./commands/help.ts";
+import { findHelpScreen, generateHelpText } from "./cli-schema.ts";
 import { pipeline, runFull } from "./utils/pipeline.ts";
 import { checkCookies, runCookieExtract } from "./commands/cookies.ts";
+import { runConfig } from "./commands/config.ts";
 import { logger } from "./utils/logger.ts";
 import { CONFIG } from "./config.ts";
 
@@ -45,18 +47,22 @@ const cleanupLogs = (): void => {
 };
 
 const main = async () => {
+  const screen = findHelpScreen(Deno.args);
+  if (screen !== null) return printScreen(screen);
+
   const args = parseCliArgs();
   const [commandArg] = args._.map(String);
 
-  if (!commandArg || args.help) return printHelp();
+  if (!commandArg) return printScreen(generateHelpText());
 
   const command = commandArg as Command;
   const subcommand = args._[1] ? String(args._[1]) : undefined;
+  const rest = args._.slice(2).map(String);
 
   cleanupLogs();
 
   // Check required env vars before doing anything
-  if (REQUIRES_COOKIES.has(command)) {
+  if (REQUIRES_COOKIES.has(command) && command !== Command.Config) {
     try {
       assertEnvVars(["FT_COOKIES_PATH", "FT_PIPELINE_PASSWORD"]);
     } catch (err) {
@@ -107,6 +113,10 @@ const main = async () => {
 
       case Command.Indexes:
         await pipeline.indexes();
+        break;
+
+      case Command.Config:
+        runConfig({ args, subcommand, rest });
         break;
 
       case Command.Full:

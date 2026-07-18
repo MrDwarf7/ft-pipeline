@@ -12,10 +12,29 @@ export const Command = {
   Classify: "classify",
   Generate: "generate",
   Indexes: "indexes",
+  Config: "config",
   Full: "full",
 } as const;
 
 export type Command = (typeof Command)[keyof typeof Command];
+
+export const ConfigSub = {
+  Show: "show",
+  File: "file",
+  Init: "init",
+  Set: "set",
+} as const;
+
+export type ConfigSub = (typeof ConfigSub)[keyof typeof ConfigSub];
+
+/** Uniform contract for every dispatched command.
+ *  The main dispatch extracts subcommand + rest from raw args ONCE and hands
+ *  them in here -- leaf commands must never re-parse args._ themselves. */
+export interface CommandContext {
+  args: Args;
+  subcommand?: string;
+  rest: string[];
+}
 
 export interface Args {
   _: (string | number)[];

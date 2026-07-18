@@ -30,6 +30,7 @@
     "@std/fs": "jsr:@std/fs@^1.0.24",
     "@std/cli": "jsr:@std/cli@1",
     "@std/log": "jsr:@std/log@0.224",
+    "@std/jsonc": "jsr:@std/jsonc@1",
     "env-paths": "npm:env-paths@^4.0.0",
     "xdg-basedir": "npm:xdg-basedir@^5.1.0",
     "zod": "npm:zod@^4.4.3"
