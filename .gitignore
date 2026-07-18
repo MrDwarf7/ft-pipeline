@@ -8,6 +8,8 @@ dist/
 .env.*
 pnpm*
 
+!.env.example
+
 .worktrees/
 
 # Local database
