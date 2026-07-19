@@ -17,6 +17,7 @@ const withTempDb = (fn: (db: Database) => void): void => {
     const db = openDatabase(path);
     db.exec(schema);
     fn(db);
+    db.close();
   } finally {
     try {
       Deno.removeSync(path);
@@ -140,52 +141,19 @@ Deno.test("prepare run/all bind special strings and null", () => {
   });
 });
 
-Deno.test("bad SQL throws with stderr context", () => {
+Deno.test("bad SQL throws with sqlite error context", () => {
   withTempDb((db) => {
     assertThrows(
       () => db.exec("SELECT * FROM does_not_exist;"),
       Error,
-      "sqlite3 error",
+      "sqlite error",
     );
     assertThrows(
       () => db.prepare("SELECT * FROM nope WHERE id = ?").all("x"),
       Error,
-      "sqlite3 error",
+      "sqlite error",
     );
   });
-});
-
-Deno.test("JSON parse failure throws (never silent [])", () => {
-  const binDir = Deno.makeTempDirSync({ prefix: "ft-fake-sqlite-" });
-  const fakeBin = `${binDir}/sqlite3`;
-  const dbPath = Deno.makeTempFileSync({ prefix: "ft-db-json-", suffix: ".db" });
-  const priorPath = Deno.env.get("PATH") ?? "";
-  try {
-    Deno.writeTextFileSync(
-      fakeBin,
-      "#!/bin/sh\nprintf '%s\\n' 'NOT_VALID_JSON {{{'\nexit 0\n",
-    );
-    Deno.chmodSync(fakeBin, 0o755);
-    Deno.env.set("PATH", `${binDir}:${priorPath}`);
-
-    const db = openDatabase(dbPath);
-    assertThrows(
-      () => db.prepare("SELECT 1 AS n").all(),
-      Error,
-      "JSON parse failed",
-    );
-  } finally {
-    Deno.env.set("PATH", priorPath);
-    try {
-      Deno.removeSync(fakeBin);
-    } catch { /* ignore */ }
-    try {
-      Deno.removeSync(binDir);
-    } catch { /* ignore */ }
-    try {
-      Deno.removeSync(dbPath);
-    } catch { /* ignore */ }
-  }
 });
 
 Deno.test("transaction commits multiple writes", () => {

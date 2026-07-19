@@ -140,7 +140,7 @@ ft-pipeline/
 |   |   |-- schema.ts      <- Zod for LLM API responses
 |   |-- utils/
 |       |-- bases.ts       <- App environment + base path resolution (XDG)
-|       |-- db.ts          <- sqlite3 CLI: insert/upsert/update/select/transaction
+|       |-- db.ts          <- node:sqlite DatabaseSync + table helpers
 |       |-- db-rows.ts     <- parseRows + zod row schemas (no .all<T>())
 |       |-- http.ts        <- Shared fetchWithRetry (429, backoff, max attempts)
 |       |-- env.ts         <- Required env var checker + .env loader
@@ -158,7 +158,7 @@ Removed dead modules: old option tombstones and legacy shell helpers (do not rei
 
 - **Runtime:** Deno (no node_modules)
 - **Language:** TypeScript
-- **DB:** SQLite via `sqlite3` CLI subprocess (`insert`/`upsert`/`update`/`select`/`transaction`)
+- **DB:** SQLite via Deno `node:sqlite` (`insert`/`upsert`/`update`/`select`/`transaction`)
 - **LLM:** Local model via llama-server at `localhost:1234` (OpenAI-compatible)
 - **HTTP:** Shared `fetchWithRetry` driven by `CONFIG.maxExternalCallAttempts` + `retryBaseMs`
 
@@ -214,8 +214,8 @@ Pipeline: SYNC -> EXTRACT -> MERGE -> CLASSIFY -> GENERATE -> INDEXES
 **Config:** `maxExternalCallAttempts` (default 4) = total HTTP attempts for X / xtracticle / LLM.
 Legacy `maxRetries` in `config.jsonc` is still accepted and mapped. Shared `retryBaseMs`.
 
-**DB:** sqlite3 CLI with `insert`/`upsert`/`update`/`select`/`transaction`. `Statement.all` returns
-`Record[]` only -- callers use `parseRows` + zod (`src/utils/db-rows.ts`). No `.all<T>()`.
+**DB:** `node:sqlite` with `insert`/`upsert`/`update`/`select`/`transaction`. `Statement.all`
+returns `Record[]` only -- callers use `parseRows` + zod (`src/utils/db-rows.ts`). No `.all<T>()`.
 
 **runFull:** continues past non-critical step failures (logs + continues); only hard throws fail the
 process for that step -- remaining steps still run.

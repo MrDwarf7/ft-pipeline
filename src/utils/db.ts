@@ -1,4 +1,9 @@
-/** Pipeline DB via sqlite3 CLI. Bound params, table helpers, fail-loud queries. */
+/** Pipeline DB via Deno's built-in `node:sqlite` (DatabaseSync).
+ *
+ * No host `sqlite3` CLI. Compiles into a self-contained binary without
+ * `--allow-run=sqlite3`. Same helper surface as the old CLI wrapper.
+ */
+import { DatabaseSync } from "node:sqlite";
 
 import { CONFIG } from "../config.ts";
 import { logger } from "./logger.ts";
@@ -33,7 +38,7 @@ export interface Database {
   /** Run trusted SQL with no result set (DDL / multi-statement). */
   exec(sql: string): void;
   prepare(sql: string): Statement;
-  /** Run writes in one sqlite3 process under BEGIN/COMMIT. */
+  /** Run writes in one connection under BEGIN/COMMIT. */
   transaction(fn: (db: Database) => void): void;
   close(): void;
 
@@ -44,27 +49,6 @@ export interface Database {
   select(table: string, opts: SelectOpts): Record<string, unknown>[];
   selectOne(table: string, opts: SelectOpts): Record<string, unknown> | null;
 }
-
-/** Encode a bind value for `.parameter set ?N <value>`. */
-const encodeParamValue = (val: SqlValue): string => {
-  if (val === null) return "null";
-  if (typeof val === "number") {
-    if (!Number.isFinite(val)) {
-      throw new Error(`sqlite3 bind: non-finite number ${val}`);
-    }
-    return String(val);
-  }
-  /* SQL string literal, protected as one double-quoted dot-command arg.
-   * Docs: wrap text as "'...'" so evaluation yields TEXT (not bare null). */
-  const sqlLiteral = `'${val.replaceAll("'", "''")}'`;
-  const cEscaped = sqlLiteral
-    .replaceAll("\\", "\\\\")
-    .replaceAll('"', '\\"')
-    .replaceAll("\n", "\\n")
-    .replaceAll("\r", "\\r")
-    .replaceAll("\t", "\\t");
-  return `"${cEscaped}"`;
-};
 
 /** Table/column names we generate; reject anything that is not an identifier. */
 const assertIdent = (name: string): string => {
@@ -82,86 +66,24 @@ const assertOrderBy = (orderBy: string): string => {
   return orderBy;
 };
 
-/** Build argv fragments: .parameter init/set then the SQL. */
-const bindArgs = (sql: string, params: readonly SqlValue[]): string[] => {
-  if (params.length === 0) return [sql];
-  const sets = params.map((p, i) => `.parameter set ?${i + 1} ${encodeParamValue(p)}`);
-  return [".parameter init", ...sets, sql];
+/** Normalize node:sqlite rows (null-prototype objects) to plain records. */
+const asRow = (row: unknown): Record<string, unknown> => {
+  if (row === null || typeof row !== "object" || Array.isArray(row)) {
+    throw new Error(`sqlite: expected object row, got ${typeof row}`);
+  }
+  return { ...(row as Record<string, unknown>) };
 };
 
-/** Run sqlite3 CLI; returns decoded stdout/stderr and exit code. */
-const sqlite3 = (
-  dbPath: string,
-  args: readonly string[],
-): { stdout: string; stderr: string; code: number } => {
-  const { code, stdout, stderr } = new Deno.Command("sqlite3", {
-    args: [dbPath, ...args],
-    stdout: "piped",
-    stderr: "piped",
-  }).outputSync();
-  return {
-    stdout: new TextDecoder().decode(stdout).trim(),
-    stderr: new TextDecoder().decode(stderr).trim(),
-    code,
-  };
+const asRows = (rows: unknown): Record<string, unknown>[] => {
+  if (!Array.isArray(rows)) {
+    throw new Error(`sqlite: expected row array, got ${typeof rows}`);
+  }
+  return rows.map(asRow);
 };
 
-/** Execute SQL (optional binds). Nonzero exit throws with stderr. */
-const execSql = (
-  dbPath: string,
-  sql: string,
-  params: readonly SqlValue[],
-): void => {
-  const { stderr, code } = sqlite3(dbPath, bindArgs(sql, params));
-  if (code !== 0) {
-    throw new Error(`sqlite3 error (code ${code}): ${stderr || "(no stderr)"}`);
-  }
-};
-
-/** Query with .mode json. Empty stdout -> []. Bad JSON or nonzero -> throw. */
-const querySql = (
-  dbPath: string,
-  sql: string,
-  params: readonly SqlValue[],
-): Record<string, unknown>[] => {
-  const { stdout, stderr, code } = sqlite3(dbPath, [
-    ".mode json",
-    ...bindArgs(sql, params),
-  ]);
-  if (code !== 0) {
-    throw new Error(`sqlite3 error (code ${code}): ${stderr || "(no stderr)"}`);
-  }
-  if (!stdout) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stdout);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `sqlite3 JSON parse failed: ${msg}; stdout=${stdout.slice(0, 200)}`,
-    );
-  }
-  const asRow = (row: unknown): Record<string, unknown> => {
-    if (row === null || typeof row !== "object" || Array.isArray(row)) {
-      throw new Error(`sqlite3 JSON: expected object row, got ${typeof row}`);
-    }
-    return row as Record<string, unknown>;
-  };
-  if (Array.isArray(parsed)) {
-    return parsed.map(asRow);
-  }
-  if (parsed !== null && typeof parsed === "object") {
-    return [asRow(parsed)];
-  }
-  throw new Error(`sqlite3 JSON: expected array or object, got ${typeof parsed}`);
-};
-
-/** Run a multi-command script (transaction batch) in one process. */
-const runScript = (dbPath: string, commands: readonly string[]): void => {
-  const { stderr, code } = sqlite3(dbPath, [".bail on", ...commands]);
-  if (code !== 0) {
-    throw new Error(`sqlite3 error (code ${code}): ${stderr || "(no stderr)"}`);
-  }
+const wrapError = (err: unknown, context: string): Error => {
+  const msg = err instanceof Error ? err.message : String(err);
+  return new Error(`sqlite error (${context}): ${msg}`);
 };
 
 interface PreparedSql {
@@ -256,66 +178,89 @@ const buildSelect = (table: string, opts: SelectOpts): PreparedSql => {
   return { sql, params: [...whereParams, ...limitParams] };
 };
 
-class Sqlite3Statement implements Statement {
-  private readonly dbPath: string;
-  private readonly sql: string;
+class NodeSqliteStatement implements Statement {
+  private readonly stmt: ReturnType<DatabaseSync["prepare"]>;
 
-  constructor(dbPath: string, sql: string) {
-    this.dbPath = dbPath;
-    this.sql = sql;
+  constructor(stmt: ReturnType<DatabaseSync["prepare"]>) {
+    this.stmt = stmt;
   }
 
   run(...params: SqlValue[]): void {
-    execSql(this.dbPath, this.sql, params);
+    try {
+      this.stmt.run(...params);
+    } catch (err) {
+      throw wrapError(err, "run");
+    }
   }
 
   all(...params: SqlValue[]): Record<string, unknown>[] {
-    return querySql(this.dbPath, this.sql, params);
+    try {
+      return asRows(this.stmt.all(...params));
+    } catch (err) {
+      throw wrapError(err, "all");
+    }
   }
 }
 
-/** Statement that appends bound SQL to a transaction command list. */
-class TxStatement implements Statement {
-  private readonly commands: string[];
-  private readonly sql: string;
-
-  constructor(commands: string[], sql: string) {
-    this.commands = commands;
-    this.sql = sql;
-  }
-
-  run(...params: SqlValue[]): void {
-    this.commands.push(...bindArgs(this.sql, params));
-  }
-
-  all(..._params: SqlValue[]): Record<string, unknown>[] {
-    throw new Error("select/all is not supported inside transaction()");
-  }
-}
-
-class Sqlite3Database implements Database {
-  private readonly dbPath: string;
+class NodeSqliteDatabase implements Database {
+  private readonly raw: DatabaseSync;
+  private readonly path: string;
+  private closed = false;
 
   constructor(dbPath: string) {
-    this.dbPath = dbPath;
+    this.path = dbPath;
+    try {
+      this.raw = new DatabaseSync(dbPath);
+    } catch (err) {
+      throw wrapError(err, "open");
+    }
   }
 
   exec(sql: string): void {
-    execSql(this.dbPath, sql, []);
+    try {
+      this.raw.exec(sql);
+    } catch (err) {
+      throw wrapError(err, "exec");
+    }
   }
 
   prepare(sql: string): Statement {
-    return new Sqlite3Statement(this.dbPath, sql);
+    try {
+      return new NodeSqliteStatement(this.raw.prepare(sql));
+    } catch (err) {
+      throw wrapError(err, "prepare");
+    }
   }
 
   transaction(fn: (db: Database) => void): void {
-    const commands: string[] = [];
-    fn(new TxDatabase(commands));
-    runScript(this.dbPath, ["BEGIN IMMEDIATE;", ...commands, "COMMIT;"]);
+    this.exec("BEGIN IMMEDIATE");
+    try {
+      fn(this);
+      this.exec("COMMIT");
+    } catch (err) {
+      try {
+        this.exec("ROLLBACK");
+      } catch (rollbackErr) {
+        logger.warn("sqlite rollback failed", {
+          error: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr),
+        });
+      }
+      throw err;
+    }
   }
 
   close(): void {
-    logger.info("DB connection closed");
+    if (this.closed) return;
+    try {
+      this.raw.close();
+    } catch (err) {
+      logger.warn("sqlite close failed", {
+        path: this.path,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    this.closed = true;
+    logger.info("DB connection closed", { path: this.path });
   }
 
   insert(table: string, row: Row): void {
@@ -350,57 +295,9 @@ class Sqlite3Database implements Database {
   }
 }
 
-/** Database that buffers writes for transaction(); rejects mid-tx queries. */
-class TxDatabase implements Database {
-  private readonly commands: string[];
-
-  constructor(commands: string[]) {
-    this.commands = commands;
-  }
-
-  exec(sql: string): void {
-    this.commands.push(sql);
-  }
-
-  prepare(sql: string): Statement {
-    return new TxStatement(this.commands, sql);
-  }
-
-  transaction(_fn: (db: Database) => void): void {
-    throw new Error("nested transaction() is not supported");
-  }
-
-  close(): void {
-    throw new Error("close() is not supported inside transaction()");
-  }
-
-  insert(table: string, row: Row): void {
-    const { sql, params } = buildInsert(table, row);
-    this.prepare(sql).run(...params);
-  }
-
-  upsert(table: string, row: Row, conflictColumns: readonly string[]): void {
-    const { sql, params } = buildUpsert(table, row, conflictColumns);
-    this.prepare(sql).run(...params);
-  }
-
-  update(table: string, set: Row, where: Row): void {
-    const { sql, params } = buildUpdate(table, set, where);
-    this.prepare(sql).run(...params);
-  }
-
-  select(_table: string, _opts: SelectOpts): Record<string, unknown>[] {
-    throw new Error("select is not supported inside transaction()");
-  }
-
-  selectOne(_table: string, _opts: SelectOpts): Record<string, unknown> | null {
-    throw new Error("selectOne is not supported inside transaction()");
-  }
-}
-
 /** Open a Database for an arbitrary file path (tests and non-singleton use). */
 export const openDatabase = (dbPath: string): Database => {
-  return new Sqlite3Database(dbPath);
+  return new NodeSqliteDatabase(dbPath);
 };
 
 let dbInstance: Database | null = null;
@@ -408,13 +305,16 @@ let dbInstance: Database | null = null;
 /** Singleton pipeline.db under CONFIG.pipelineDbPath. */
 export const getPipelineDb = (): Database => {
   if (!dbInstance) {
-    dbInstance = new Sqlite3Database(CONFIG.pipelineDbPath);
+    dbInstance = new NodeSqliteDatabase(CONFIG.pipelineDbPath);
   }
   return dbInstance;
 };
 
-/** Drop the singleton reference (process-level; no open handle to free). */
+/** Close and drop the singleton handle. */
 export const closePipelineDb = (): void => {
+  if (dbInstance !== null) {
+    dbInstance.close();
+  }
   dbInstance = null;
 };
 

@@ -1,4 +1,5 @@
 import { assertEquals } from "@std/assert";
+import { DatabaseSync } from "node:sqlite";
 
 const projectRoot = new URL("../..", import.meta.url).pathname;
 
@@ -35,13 +36,16 @@ Deno.test({
       });
       assertEquals(code, 0, `migrate failed: ${stderr}`);
 
-      const tables = new Deno.Command("sqlite3", {
-        args: [dbPath, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"],
-        stdout: "piped",
-      }).outputSync();
-      const out = new TextDecoder().decode(tables.stdout);
-      assertEquals(out.includes("bookmarks"), true);
-      assertEquals(out.includes("migration_runs"), true);
+      const db = new DatabaseSync(dbPath);
+      const names = db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+        )
+        .all()
+        .map((r) => String((r as { name: string }).name));
+      db.close();
+      assertEquals(names.includes("bookmarks"), true);
+      assertEquals(names.includes("migration_runs"), true);
     } finally {
       await Deno.remove(dir, { recursive: true });
     }

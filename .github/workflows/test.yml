@@ -32,7 +32,8 @@ jobs:
 
       - uses: ./.github/actions/setup-deno
         with:
-          install-sqlite: "true"
+          # DB is node:sqlite -- no host sqlite3 CLI
+          install-sqlite: "false"
 
       - name: Unit + integration tests
         run: deno task test:unit

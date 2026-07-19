@@ -24,9 +24,9 @@ Canonical retry knob is **`maxExternalCallAttempts`** (default **4**, total HTTP
 xtracticle / LLM). Legacy `maxRetries` in `config.jsonc` is still accepted and mapped. Shared
 `retryBaseMs`.
 
-**DB:** sqlite3 CLI with `insert`/`upsert`/`update`/`select`/`transaction`. `Statement.all` returns
-`Record[]` only; callers use `parseRows` + zod (`src/utils/db-rows.ts`). No `.all<T>()`. Complex
-WHERE still `prepare`.
+**DB:** `node:sqlite` (`DatabaseSync`) with `insert`/`upsert`/`update`/`select`/`transaction`.
+`Statement.all` returns `Record[]` only; callers use `parseRows` + zod (`src/utils/db-rows.ts`). No
+host `sqlite3` CLI; compiles self-contained.
 
 **runFull:** continues past non-critical step failures (log + continue); only hard throws mark that
 step failed -- remaining steps still run.
@@ -50,10 +50,9 @@ Details (historical briefs): [`docs/worktrees-immediate.md`](docs/worktrees-imme
 - Config resolution unit test (needs injectable load)
 - Feature parity: media download, folders, LLM fallback chain
 - Index multi-type/domain display
-- **Self-contained binary DB:** release builds still require host `sqlite3` on PATH
-  (`Deno.Command("sqlite3")` in `src/utils/db.ts`). True single-file like Rust means migrating the
-  DB layer to embedded SQLite (`@db/sqlite` FFI / `node:sqlite`) and dropping `--allow-run=sqlite3`.
-  Non-trivial rewrite; keep CLI helpers until then.
+- **Self-contained binary DB:** DONE -- `node:sqlite` backend; no host CLI / no
+  `--allow-run=sqlite3`. (`@db/sqlite` FFI segfaulted here and still dlopens a system lib -- not
+  used.)
 - **Compile startup / size (later perf):** binaries ~90--130MB with Deno runtime inside. Tried
   `deno compile --bundle --minify` (experimental) -- smaller payload but broke with JSON `import` of
   `deno.json` path layout. Revisit when stable; for now `--exclude-unused-npm` only.
@@ -90,7 +89,7 @@ All items below shipped in waves 0-2. Do not re-open as active work unless code 
 - Classify single-item failure: log + count `"failed"`, do **not** fail-fast the whole run.
 - LLM `check()` failure: do **not** start classify batches (probe is intentional type-state).
 - `runFull`: log step failure and continue remaining steps.
-- No Prisma; stay on sqlite3 CLI helpers.
+- No Prisma; stay on thin SQLite helpers (`node:sqlite` / `src/utils/db.ts`).
 
 ---
 
@@ -121,7 +120,7 @@ as old B4 text claimed.
 | Full pipeline continues when a step fails | **Desired** -- log + hints; do not fail-fast the whole `runFull` by default |
 | Classify single-item failure              | **Must not** kill the run; log and count as failed (`settleClassify`)       |
 | LLM `check()` probe failure               | **Must** block classify (intentional type-state; not a per-item skip)       |
-| Prisma / heavy ORM                        | **No** -- sqlite3 CLI helpers only                                          |
+| Prisma / heavy ORM                        | **No** -- thin `node:sqlite` helpers only                                   |
 | Vitest                                    | Optional later; Deno.test is enough for now                                 |
 | Dead ft-cli / options tombstones          | **Removed** -- do not reintroduce                                           |
 

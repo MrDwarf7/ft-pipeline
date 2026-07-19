@@ -3,8 +3,8 @@
 Turn X (Twitter) bookmarks into a local archive: Clippings text, a SQLite DB, and Obsidian-style
 markdown pages by type and topic.
 
-You do not need to write TypeScript. Install Deno, keep `sqlite3` on your PATH, save cookies once
-for sync, and run a local LLM only if you want auto-classification.
+You do not need to write TypeScript. Install Deno, save cookies once for sync, and run a local LLM
+only if you want auto-classification.
 
 ## Contents
 
@@ -32,7 +32,7 @@ If someone sent you this README (or the repo link) and wants the pipeline runnin
 3. Editing code? Also read [AGENTS.md](./AGENTS.md) before changing TypeScript.
 4. Packaging layout for multi-agent skills: [`.agents/README.md`](./.agents/README.md).
 
-Minimal "get them unblocked" path once Deno + `sqlite3` exist:
+Minimal "get them unblocked" path once Deno is installed:
 
 ```bash
 deno task start migrate
@@ -43,8 +43,8 @@ deno task start full --password "$FT_PIPELINE_PASSWORD"
 ```
 
 Prefer `./dist/ft-pipeline` after `deno task build` for cron. Release builds use least-privilege
-flags (not `--allow-all`); host still needs `sqlite3` on PATH. Soft failures inside `full` (e.g.
-classify with no LLM) are logged; remaining steps still run.
+flags (not `--allow-all`). Soft failures inside `full` (e.g. classify with no LLM) are logged;
+remaining steps still run.
 
 Humans who are not using an agent: skip this section and keep reading.
 
@@ -78,42 +78,19 @@ security, …). Skip classify if you only want text and files.
 
 ### What you need
 
-| Need                                     | Why                                             |
-| ---------------------------------------- | ----------------------------------------------- |
-| [Deno](https://deno.land/) 2.x           | Runs the CLI (or use a prebuilt binary)         |
-| `sqlite3` on PATH                        | Database -- required even for compiled binaries |
-| X session cookies                        | Only for sync / full                            |
-| Local OpenAI-compatible LLM on port 1234 | Only for classify (or full when classify runs)  |
-| Network to xtracticle.com                | Extract                                         |
+| Need                                     | Why                                            |
+| ---------------------------------------- | ---------------------------------------------- |
+| [Deno](https://deno.land/) 2.x           | Runs the CLI (or use a prebuilt binary)        |
+| X session cookies                        | Only for sync / full                           |
+| Local OpenAI-compatible LLM on port 1234 | Only for classify (or full when classify runs) |
+| Network to xtracticle.com                | Extract                                        |
+
+No host `sqlite3` CLI. The DB uses Deno's built-in `node:sqlite` and ships inside `deno compile`
+binaries.
 
 Defaults live under `~/.config/ft-pipeline/` (DB, logs, encrypted cookies, config). Vault paths
 (Clippings + wiki) come from config; stock defaults point at `~/StoneVault/…` if you use that
 layout.
-
-### Install `sqlite3` (required)
-
-The pipeline talks to SQLite through the **system `sqlite3` CLI**, not an embedded engine. A
-`deno compile` binary still shells out to `sqlite3`, so the host must provide it.
-
-Check:
-
-```bash
-sqlite3 --version
-```
-
-| OS                   | Install                           |
-| -------------------- | --------------------------------- |
-| Debian / Ubuntu      | `sudo apt-get install -y sqlite3` |
-| Fedora               | `sudo dnf install sqlite`         |
-| Arch                 | `sudo pacman -S sqlite`           |
-| macOS (Homebrew)     | `brew install sqlite`             |
-| Windows (winget)     | `winget install SQLite.SQLite`    |
-| Windows (Chocolatey) | `choco install sqlite`            |
-| Windows (Scoop)      | `scoop install sqlite`            |
-
-After install, open a **new** terminal so `PATH` updates, then re-run `sqlite3 --version`. On
-Windows the binary may be `sqlite3.exe`; that still counts as `sqlite3` on PATH for our
-`--allow-run=sqlite3` compile flag.
 
 ### First run (copy-paste)
 
@@ -136,7 +113,7 @@ deno task start config init
 deno task start full --password "$FT_PIPELINE_PASSWORD"
 ```
 
-Prefer a binary (cron-friendly). Still needs system `sqlite3` on PATH:
+Prefer a binary (cron-friendly; DB is embedded):
 
 ```bash
 deno task build
@@ -194,8 +171,8 @@ deno task start <command> [options]
 ./dist/ft-pipeline <command> [options]
 ```
 
-`deno task start` is least-privilege `deno run` (read/write/env/sys=homedir/run=sqlite3/net). Tests
-still use `--allow-all`.
+`deno task start` is least-privilege `deno run` (read/write/env/sys=homedir/net). Tests still use
+`--allow-all`.
 
 ### Commands
 

@@ -17,8 +17,8 @@ invent `~/...` paths that resolve into a sandbox home unless the user said so.
 ## Prefer the compiled binary when present
 
 ```bash
-# From repo root
-test -x ./dist/ft-pipeline && BIN=./dist/ft-pipeline || BIN="deno run --allow-all src/main.ts"
+# From repo root (DB is node:sqlite -- no host sqlite3 CLI)
+test -x ./dist/ft-pipeline && BIN=./dist/ft-pipeline || BIN="deno task start"
 $BIN --help
 $BIN migrate
 $BIN config show
@@ -27,7 +27,7 @@ $BIN config show
 Build if missing: `deno task build` -> `./dist/ft-pipeline`.
 
 There is **no** `deno task full` / `deno task sync`. Use `$BIN <command>` or
-`deno task start -- <command>`.
+`deno task start <command>`.
 
 ## Safe first-time path (humans / agents)
 
@@ -88,7 +88,7 @@ Bare cron without the wrapper (password from a root-only file):
 
 ```bash
 0 10,16,2 * * * FT_COOKIES_PATH=... FT_PIPELINE_PASSWORD="$(cat .../.pw)" \
-  /usr/bin/deno run --allow-all /abs/path/src/main.ts full
+  /abs/path/dist/ft-pipeline full
 ```
 
 ## Config notes agents forget

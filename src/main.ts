@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write --allow-env --allow-sys=homedir --allow-run=sqlite3 --allow-net
+#!/usr/bin/env -S deno run --allow-read --allow-write --allow-env --allow-sys=homedir --allow-net
 
 /**
  * ft-pipeline -- Bookmark sync, extract, classify, generate pipeline

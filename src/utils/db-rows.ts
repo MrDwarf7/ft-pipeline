@@ -1,4 +1,4 @@
-/** Zod schemas for sqlite3 .mode json rows at command boundaries. */
+/** Zod schemas for SQLite rows at command boundaries. */
 
 import { z } from "zod";
 

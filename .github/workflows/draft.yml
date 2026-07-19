@@ -52,7 +52,6 @@ jobs:
             --allow-write \
             --allow-env \
             --allow-sys=homedir \
-            --allow-run=sqlite3 \
             --allow-net \
             --exclude-unused-npm \
             --target "${{ matrix.target }}" \
@@ -136,8 +135,8 @@ jobs:
             echo "From commit: ${GITHUB_SHA:0:8}"
             echo "Generated on: $(date -u +"%Y-%m-%d %H:%M") UTC"
             echo "Platforms: linux-x64, windows-x64, macos-arm64, macos-x64"
-            echo "Compile: least-privilege (read/write/env/sys=homedir/run=sqlite3/net)."
-            echo "Host still needs sqlite3 on PATH (DB is CLI-backed, not embedded)."
+            echo "Compile: least-privilege (read/write/env/sys=homedir/net); node:sqlite embedded."
+            echo "No host sqlite3 CLI required (node:sqlite in binary)."
             echo "EOF"
           } >> "$GITHUB_ENV"
 

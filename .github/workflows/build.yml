@@ -19,7 +19,6 @@ env:
     --allow-write
     --allow-env
     --allow-sys=homedir
-    --allow-run=sqlite3
     --allow-net
     --exclude-unused-npm
 
@@ -33,7 +32,7 @@ jobs:
 
       - uses: ./.github/actions/setup-deno
         with:
-          install-sqlite: "true"
+          install-sqlite: "false"
 
       - name: Format, typecheck, lint
         run: deno task ch:all
