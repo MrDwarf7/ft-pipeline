@@ -42,6 +42,17 @@ const log = (level: LogLevel, message: string, data?: LogData): void => {
   logToFile(plain);
 };
 
+/* Multi-line block output (help text). Drops to its own line on stdout with no
+ * trailing space on the [INFO] prefix; the log file stays single-line. */
+export const logBlock = (message: string): void => {
+  const body_temp = message.startsWith("\n") ? message.slice(1) : message;
+  const body = body_temp.endsWith("\n") ? body_temp.trimEnd() : body_temp;
+  const ts = new Date().toISOString();
+  const colored = `${ts} ${COLORS.info}[INFO]${RESET}\n${body}\n`;
+  Deno.stdout.writeSync(encoder.encode(colored));
+  logToFile(`${ts} [INFO] ${body}`);
+};
+
 export const logger = {
   info: (message: string, data?: LogData) => log("info", message, data),
   warn: (message: string, data?: LogData) => log("warn", message, data),
