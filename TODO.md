@@ -11,25 +11,37 @@ Verified against `src/` on **2026-07-20**. Historical "we did X on date Y" write
 
 | Step     | Status | Notes |
 | -------- | ------ | ----- |
-| Sync     | OK     | Native GraphQL (`extraction/graphql.ts`). Leaf tweet Zod; timeline walk still cast-heavy. 429/retry exists **only here**. |
-| Extract  | OK*    | xtracticle -> Clippings. Article images **are** embedded as remote `![](url)` in clippings (B4 partially done). Still casty; no shared 429 handler; no raw-JSON archive. |
-| Merge    | OK     | Clippings -> `clippings_text`. |
-| Classify | OK*    | Per-item failure **intended** to log and continue; see **I0** -- batch path currently bypasses that. Continue-on-step-failure in `runFull` is **desired**. |
+| Sync     | OK     | GraphQL + `fetchWithRetry`; envelope Zod; parse split; drop counts / drift hard-fail. |
+| Extract  | OK     | xtracticle Zod + retry; module split; remote article images in clippings. |
+| Merge    | OK     | Clippings -> `clippings_text`; singular/plural type rank fixed. |
+| Classify | OK     | Per-item settle path; LLM retry + response Zod; empty content throws item-level. |
 | Generate | OK     | Template render from `pipeline.db`. |
-| Indexes  | OK*    | Hash caching works. Entity null-handle filter exists. Indexes use **primary_** only (multi-label backlog). |
+| Indexes  | OK     | Split query/view/render/write; hash caching; primary_* only (multi-label still backlog). |
 
-\* = open quality/robustness work below, not "broken end-to-end."
+**Config:** file + env + zod (`config` command). Fail-loud on invalid file; NotFound -> defaults.  
+**DB:** sqlite3 CLI runner + `insert`/`upsert`/`update`/`select`/`transaction` (call sites still
+mostly `prepare` -- Wave 2).  
+**Tests:** `deno task test:unit` -- 92 passed after immediate merge.  
+**Dead files:** removed (`options.ts`, `ft-cli.ts`).
 
-**Config:** file + env + zod (`config` command: show/file/init/set).  
-**Tests:** not empty -- `deno task test` / `test:unit` / `test:e2e` exist; coverage is thin (see I4).  
-**Dead files still in tree:** `src/options.ts` (tombstone), `src/utils/ft-cli.ts` (throws only).
 
 ---
 
-## Immediate work (do these first)
+## Immediate work -- Wave 0 + Wave 1 LANDED
 
-Maintainability + robustness. Feature parity (media/folders/fallback) waits until this layer is
-sound. Order is dependency-aware.
+Merged as `merge(immediate): wave0 + wave1 maintainability stack` (see jj log). Details and agent
+briefs remain in [`docs/worktrees-immediate.md`](docs/worktrees-immediate.md).
+
+Still open under immediate/Wave 2:
+
+- **WT-db-callers** -- migrate command SQL to table helpers + zod rows
+- **WT-integration-tests** -- more fixtures / e2e glue
+- **I8 config resolution test** -- skipped (needs injectable load)
+- Feature parity (media / folders / LLM fallback) unchanged below
+
+### Historical task list (I0--I9) -- kept for audit; Wave 0/1 items done in code
+
+Maintainability items below were the original checklist. Prefer the status table above + Wave 2.
 
 ### I0 -- Classify: actually survive per-item LLM failures
 

@@ -340,24 +340,24 @@ cross modules. Own `tests/**` and fixture JSON only unless a tiny export is requ
 
 ## Quick status board (tick when merged)
 
-**Wave 0**
+**Wave 0** -- landed in `merge(immediate)` (2026-07-20)
 
-- [ ] WT-hygiene
-- [ ] WT-classify
-- [ ] WT-db
-- [ ] WT-migrate
-- [ ] WT-http
-- [ ] WT-indexes
-- [ ] WT-tests-pure
+- [x] WT-hygiene
+- [x] WT-classify
+- [x] WT-db
+- [x] WT-migrate
+- [x] WT-http
+- [x] WT-indexes
+- [x] WT-tests-pure
 
-**Wave 1**
+**Wave 1** -- landed in same merge
 
-- [ ] WT-sync
-- [ ] WT-extract
-- [ ] WT-llm
-- [ ] WT-catches
+- [x] WT-sync
+- [x] WT-extract
+- [x] WT-llm
+- [x] WT-catches
 
-**Wave 2**
+**Wave 2** -- not started
 
 - [ ] WT-db-callers
 - [ ] WT-integration-tests
