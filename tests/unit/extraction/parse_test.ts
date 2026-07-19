@@ -4,7 +4,7 @@ import { BookmarksResponseSchema, TweetDataSchema } from "../../../src/extractio
 
 import { loadFixture as loadJsonFixture } from "../../fixtures/load.ts";
 
-const loadFixture = async (name: string): Promise<unknown> => loadJsonFixture(`graphql/${name}`);
+const loadFixture = (name: string): Promise<unknown> => loadJsonFixture(`graphql/${name}`);
 
 const minimalTweetResult = {
   legacy: {
