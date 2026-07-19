@@ -1,0 +1,93 @@
+{
+  "data": {
+    "bookmark_timeline_v2": {
+      "timeline": {
+        "instructions": [
+          {
+            "type": "TimelineAddEntries",
+            "entries": [
+              {
+                "entryId": "tweet-1001",
+                "sortIndex": "1",
+                "content": {
+                  "entryType": "TimelineTimelineItem",
+                  "itemContent": {
+                    "itemType": "TimelineTweet",
+                    "tweet_results": {
+                      "result": {
+                        "__typename": "Tweet",
+                        "legacy": {
+                          "id_str": "1001",
+                          "full_text": "first bookmark text",
+                          "created_at": "Mon Jan 01 12:00:00 +0000 2024",
+                          "favorite_count": 10,
+                          "retweet_count": 1,
+                          "reply_count": 0,
+                          "quote_count": 0,
+                          "bookmark_count": 2
+                        },
+                        "core": {
+                          "user_results": {
+                            "result": {
+                              "core": {
+                                "screen_name": "alice",
+                                "name": "Alice"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "entryId": "tweet-1002",
+                "sortIndex": "2",
+                "content": {
+                  "entryType": "TimelineTimelineItem",
+                  "itemContent": {
+                    "itemType": "TimelineTweet",
+                    "tweet_results": {
+                      "result": {
+                        "tweet": {
+                          "__typename": "Tweet",
+                          "legacy": {
+                            "id_str": "1002",
+                            "full_text": "nested visibility wrapper",
+                            "created_at": "Tue Jan 02 13:30:00 +0000 2024",
+                            "favorite_count": 3,
+                            "retweet_count": 0,
+                            "reply_count": 1,
+                            "quote_count": 0,
+                            "bookmark_count": 1
+                          },
+                          "core": {
+                            "user_results": {
+                              "result": {
+                                "core": {
+                                  "screen_name": "bob",
+                                  "name": "Bob"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "entryId": "cursor-bottom-multi",
+                "content": {
+                  "value": "cursor-multi-next"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

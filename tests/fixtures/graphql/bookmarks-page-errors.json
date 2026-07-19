@@ -1,0 +1,11 @@
+{
+  "errors": [
+    {
+      "message": "Rate limit exceeded",
+      "code": 88
+    },
+    {
+      "message": "Over capacity"
+    }
+  ]
+}

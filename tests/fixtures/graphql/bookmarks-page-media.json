@@ -1,0 +1,88 @@
+{
+  "data": {
+    "bookmark_timeline_v2": {
+      "timeline": {
+        "instructions": [
+          {
+            "type": "TimelineAddEntries",
+            "entries": [
+              {
+                "entryId": "tweet-2001",
+                "sortIndex": "1",
+                "content": {
+                  "entryType": "TimelineTimelineItem",
+                  "itemContent": {
+                    "itemType": "TimelineTweet",
+                    "tweet_results": {
+                      "result": {
+                        "__typename": "Tweet",
+                        "legacy": {
+                          "id_str": "2001",
+                          "full_text": "photo drop https://t.co/xyz",
+                          "created_at": "Wed Mar 05 08:07:00 +0000 2025",
+                          "favorite_count": 42,
+                          "retweet_count": 4,
+                          "reply_count": 2,
+                          "quote_count": 1,
+                          "bookmark_count": 9,
+                          "entities": {
+                            "urls": [
+                              {
+                                "expanded_url": "https://t.co/xyz",
+                                "url": "https://t.co/xyz"
+                              },
+                              {
+                                "expanded_url": "https://cdn.example/real-link",
+                                "url": "https://t.co/abc"
+                              }
+                            ],
+                            "media": [
+                              {
+                                "type": "photo",
+                                "media_url_https": "https://pbs.twimg.com/media/legacy-photo.jpg"
+                              }
+                            ]
+                          },
+                          "extended_entities": {
+                            "media": [
+                              {
+                                "type": "photo",
+                                "media_url_https": "https://pbs.twimg.com/media/extended-photo.jpg",
+                                "media_info": {
+                                  "original_img_url": "https://pbs.twimg.com/media/original.jpg"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "core": {
+                          "user_results": {
+                            "result": {
+                              "core": {
+                                "screen_name": "photog",
+                                "name": "Photo Graph"
+                              }
+                            }
+                          }
+                        },
+                        "views": {
+                          "count": "12345"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "entryId": "cursor-bottom-media",
+                "content": {
+                  "value": "cursor-after-media"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

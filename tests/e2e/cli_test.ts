@@ -60,3 +60,29 @@ Deno.test({
     assertEquals(stdout.includes("migrate"), true);
   },
 });
+
+Deno.test({
+  name: "e2e: config show prints effective JSON keys",
+  permissions: { read: true, write: true, env: true, run: true },
+  async fn() {
+    const { code, stdout, stderr } = await runCli(["config", "show"], {
+      FT_NO_HOUSEKEEPING: "1",
+    });
+    assertEquals(code, 0, `config show failed: ${stderr}`);
+    assertEquals(stdout.includes("pipelineDbPath"), true);
+    assertEquals(stdout.includes("minPostTextLength"), true);
+    assertEquals(stdout.includes("clippingDirs"), true);
+  },
+});
+
+Deno.test({
+  name: "e2e: config file prints a path string",
+  permissions: { read: true, write: true, env: true, run: true },
+  async fn() {
+    const { code, stdout, stderr } = await runCli(["config", "file"], {
+      FT_NO_HOUSEKEEPING: "1",
+    });
+    assertEquals(code, 0, `config file failed: ${stderr}`);
+    assertEquals(stdout.includes("config.jsonc"), true);
+  },
+});

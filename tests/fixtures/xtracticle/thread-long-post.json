@@ -1,0 +1,16 @@
+{
+  "tweets": [
+    {
+      "id": "long-1",
+      "url": "https://x.com/u/status/long-1",
+      "text": "This is a long-form post without an X Article payload. It exceeds the minimum post text length threshold so extract should classify it as an article clipping rather than a short post. Padding text to ensure we clear two hundred characters of body content for the pipeline threshold check used by classifyTweet.",
+      "author": {
+        "screen_name": "essayist",
+        "name": "Essayist"
+      },
+      "created_at": "Tue Feb 02 10:00:00 +0000 2024",
+      "article": null,
+      "media": null
+    }
+  ]
+}

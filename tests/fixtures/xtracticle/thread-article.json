@@ -1,0 +1,59 @@
+{
+  "tweets": [
+    {
+      "id": "art-1",
+      "url": "https://x.com/author/status/art-1",
+      "text": "",
+      "author": {
+        "screen_name": "author",
+        "name": "Article Author"
+      },
+      "created_at": "Fri Aug 28 15:30:00 +0000 2020",
+      "likes": 100,
+      "bookmarks": 50,
+      "views": 1000,
+      "media": {
+        "all": [
+          {
+            "url": "https://cdn.example/tweet-photo.jpg",
+            "type": "photo"
+          }
+        ]
+      },
+      "article": {
+        "title": "Deep dive into agents",
+        "preview_text": "preview",
+        "content": {
+          "blocks": [
+            { "text": "Opening paragraph about agentic workflows." },
+            { "text": "  " },
+            { "text": "Second section with tooling notes." },
+            {}
+          ],
+          "entityMap": {}
+        },
+        "cover_media": {
+          "media_info": {
+            "original_img_url": "https://cdn.example/cover.jpg"
+          }
+        },
+        "media_entities": [
+          {
+            "media_info": {
+              "original_img_url": "https://cdn.example/cover.jpg"
+            }
+          },
+          {
+            "media_info": {
+              "original_img_url": "https://cdn.example/inline-1.jpg"
+            }
+          },
+          {
+            "media_info": {}
+          },
+          {}
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "data": {
+    "bookmark_timeline_v2": {
+      "timeline": {
+        "instructions": [
+          {
+            "type": "TimelineAddEntries",
+            "entries": [
+              {
+                "entryId": "who-to-follow-module",
+                "sortIndex": "0",
+                "content": {
+                  "entryType": "TimelineTimelineModule",
+                  "items": []
+                }
+              },
+              {
+                "entryId": "tweet-3001",
+                "sortIndex": "1",
+                "content": {
+                  "entryType": "TimelineTimelineItem",
+                  "itemContent": {
+                    "itemType": "TimelineTweet",
+                    "tweet_results": {
+                      "result": {
+                        "legacy": {
+                          "id_str": "3001",
+                          "text": "legacy text field only",
+                          "created_at": "Thu Apr 10 16:45:00 +0000 2025",
+                          "favorite_count": 0,
+                          "retweet_count": 0,
+                          "reply_count": 0,
+                          "quote_count": 0,
+                          "bookmark_count": 0
+                        },
+                        "core": {
+                          "user_results": {
+                            "result": {
+                              "core": {
+                                "screen_name": "carol",
+                                "name": "Carol"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "entryId": "cursor-bottom-skip",
+                "content": {
+                  "value": "cursor-skip-next"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

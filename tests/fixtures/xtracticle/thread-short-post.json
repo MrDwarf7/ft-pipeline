@@ -1,0 +1,14 @@
+{
+  "tweets": [
+    {
+      "id": "post-1",
+      "url": "https://x.com/u/status/post-1",
+      "text": "short take, no media",
+      "author": {
+        "screen_name": "poster",
+        "name": "Poster"
+      },
+      "created_at": "Wed Mar 03 11:11:00 +0000 2024"
+    }
+  ]
+}
