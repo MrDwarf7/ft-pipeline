@@ -1,0 +1,50 @@
+name: "Build - Check & Compile"
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  PROJECT_NAME: ft-pipeline
+
+jobs:
+  check:
+    name: "Build - ${{ matrix.task }} (${{ matrix.os }})"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            task: ch:all
+            run: deno task ch:all
+            sqlite: "true"
+          - os: ubuntu-latest
+            task: compile
+            run: deno task build && test -x dist/ft-pipeline
+            sqlite: "false"
+          - os: windows-latest
+            task: compile
+            run: deno task build
+            sqlite: "false"
+    runs-on: ${{ matrix.os }}
+    if: ${{ !contains(github.event.head_commit.message, 'skip ci') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-deno
+        with:
+          install-sqlite: ${{ matrix.sqlite }}
+
+      - name: ${{ matrix.task }}
+        shell: bash
+        run: ${{ matrix.run }}

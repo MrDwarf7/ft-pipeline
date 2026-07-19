@@ -1,0 +1,43 @@
+name: "Test"
+
+on:
+  push:
+    branches:
+      - master
+      - main
+      - develop
+      - dev
+  pull_request:
+    branches:
+      - master
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  PROJECT_NAME: ft-pipeline
+  FT_NO_HOUSEKEEPING: "1"
+
+jobs:
+  test:
+    name: "Test - ${{ matrix.os }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    if: ${{ !contains(github.event.head_commit.message, 'skip ci') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-deno
+        with:
+          install-sqlite: "true"
+
+      - name: Unit + integration tests
+        run: deno task test:unit
+
+      - name: E2E tests
+        run: deno task test:e2e

@@ -1,0 +1,45 @@
+name: "Formatting"
+
+on:
+  push:
+    branches:
+      - master
+      - main
+      - develop
+      - dev
+  pull_request:
+    branches:
+      - master
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  PROJECT_NAME: ft-pipeline
+
+jobs:
+  format-lint:
+    name: "Formatting - ${{ matrix.os }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    if: ${{ !contains(github.event.head_commit.message, 'skip ci') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-deno
+        with:
+          install-sqlite: "false"
+
+      - name: Format check
+        run: deno fmt --check
+
+      - name: Lint
+        run: deno lint
+
+      - name: Typecheck
+        run: deno check src/main.ts

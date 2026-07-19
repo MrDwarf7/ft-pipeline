@@ -1,0 +1,44 @@
+name: "Setup Deno"
+description: "Install Deno 2.x, cache modules + node_modules, optional sqlite3"
+inputs:
+  install-sqlite:
+    description: "Install sqlite3 CLI (Linux apt / Windows choco)"
+    required: false
+    default: "true"
+  deno-version:
+    description: "Deno version for denoland/setup-deno"
+    required: false
+    default: "v2.x"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Deno
+      uses: denoland/setup-deno@v2
+      with:
+        deno-version: ${{ inputs.deno-version }}
+        cache: true
+
+    - name: Cache node_modules (npm deps via Deno)
+      uses: actions/cache@v4
+      with:
+        path: |
+          node_modules
+        key: node-modules-${{ runner.os }}-${{ hashFiles('deno.lock', 'deno.json') }}
+        restore-keys: |
+          node-modules-${{ runner.os }}-
+
+    - name: Install sqlite3 (Linux)
+      if: ${{ inputs.install-sqlite == 'true' && runner.os == 'Linux' }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y sqlite3
+        sqlite3 --version
+
+    - name: Install sqlite3 (Windows)
+      if: ${{ inputs.install-sqlite == 'true' && runner.os == 'Windows' }}
+      shell: pwsh
+      run: |
+        choco install sqlite -y
+        sqlite3 --version

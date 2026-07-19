@@ -1,0 +1,41 @@
+# Optional publish helper (not a live workflow; underscore-prefixed).
+# Wire into a real workflow when you want non-draft release asset uploads.
+name: "Publish"
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags: ["v[0-9]+.[0-9]+.[0-9]?"]
+env:
+  preview: ${{ github.event_name == 'release' && contains(github.event.release.tag_name, 'preview') }}
+  PROJECT_NAME: ft-pipeline
+jobs:
+  publish:
+    name: "Publish - publish"
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: "Checkout sources"
+        uses: actions/checkout@v4
+
+      - name: "Download artifacts"
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: "Echo Tag Ref(s)"
+        run: |
+          echo "Tag name for GITHUB_REF_NAME: $GITHUB_REF_NAME"
+          echo "Tag name from github.ref_name ${{ github.ref_name }}"
+
+      - name: "Upload Release Assets"
+        uses: svenstaro/upload-release-action@2.9.0
+        if: env.preview == 'false'
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ env.PROJECT_NAME }}-*.zip
+          file_glob: true
+          overwrite: true
