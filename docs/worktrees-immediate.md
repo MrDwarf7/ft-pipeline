@@ -82,8 +82,9 @@ type SqlValue = string | number | null;
 type Row = Record<string, SqlValue>;
 
 interface Statement {
-  run(params: readonly SqlValue[]): void;
-  all(params: readonly SqlValue[]): Record<string, unknown>[];
+  /** Prefer a single array arg long-term; rest form kept so existing call sites typecheck. */
+  run(...params: SqlValue[]): void;
+  all(...params: SqlValue[]): Record<string, unknown>[];
 }
 
 interface Database {
