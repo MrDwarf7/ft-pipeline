@@ -193,6 +193,16 @@ deno task test:unit      # unit + integration tests
 There is **no** `deno task migrate` / `sync` / `full`. After install, run `ft-pipeline <cmd>` (or
 `deno task start <cmd>` / `./dist/ft-pipeline <cmd>`).
 
+## Branches (jj bookmarks)
+
+| Bookmark  | Role                                                                 |
+| --------- | -------------------------------------------------------------------- |
+| `dev`     | Day-to-day tip. CI Format/Test/Build + **nightly** release track it. |
+| `main`    | Stable / release line. Tag `v*` drafts still ship from tags.         |
+| `nightly` | Auto-moved by CI to match the latest successful `dev` nightly build. |
+
+GitHub default branch can stay `main`. Work and push on `dev` unless cutting a release.
+
 ## Pipeline Status
 
 Verified against `src/` post-refactor (immediate waves 0-2). See `TODO.md` for feature backlog.
