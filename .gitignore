@@ -10,6 +10,8 @@ pnpm*
 
 !.env.example
 
+examples/*
+
 .worktrees/
 
 # Local database
@@ -21,6 +23,8 @@ pipeline.db-shm
 ft-pipeline
 .old/
 _fixes/
+_archive/
+FIELDTHEORY_AUDIT.md
 FIELDTHEORY_AUDIT.md
 FIELDTHEORY_AUDIT.md
 FIELDTHEORY_AUDIT.md

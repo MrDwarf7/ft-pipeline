@@ -10,7 +10,7 @@
 import { assertEnvVars } from "./utils/env.ts";
 import { Command, parseCliArgs } from "./types.ts";
 import { printScreen } from "./commands/help.ts";
-import { findHelpScreen, generateHelpText } from "./cli-schema.ts";
+import { findHelpScreen } from "./cli-schema.tree.ts";
 import { pipeline, runFull } from "./utils/pipeline.ts";
 import { checkCookies, runCookieExtract } from "./commands/cookies.ts";
 import { runConfig } from "./commands/config.ts";
@@ -53,7 +53,7 @@ const main = async () => {
   const args = parseCliArgs();
   const [commandArg] = args._.map(String);
 
-  if (!commandArg) return printScreen(generateHelpText());
+  if (!commandArg) return printScreen(findHelpScreen(["--help"]) ?? "");
 
   const command = commandArg as Command;
   const subcommand = args._[1] ? String(args._[1]) : undefined;

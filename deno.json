@@ -63,5 +63,8 @@
   "nodeModulesDir": "auto",
   "unstable": [
     "ffi"
-  ]
+  ],
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true
+  }
 }

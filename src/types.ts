@@ -1,7 +1,7 @@
 // types.ts -- Command enum, Args interface, parse helpers
 
 import { parseArgs } from "@std/cli/parse-args";
-import { getParseArgsConfig } from "./cli-schema.ts";
+import { getParseArgsConfig } from "./cli-schema.tree.ts";
 
 export const Command = {
   Migrate: "migrate",

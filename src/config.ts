@@ -8,6 +8,7 @@
  * The config file is generated on first run with `CONFIG` defaults. Edit it
  * directly, or use `ft-pipeline config set <key> <value>`. Validation runs on
  * every load via zod, so a malformed file fails fast with the offending line.
+ *
  */
 
 import { parse as parseJsonc } from "@std/jsonc";
@@ -121,8 +122,9 @@ export const CONFIG: Config = loadConfig();
 
 /* Serialization API -- used by the `config` command.
  * Writes the effective config (file layer merged over defaults, before env
- * overrides) so the on-disk file is portable and explicit. */
-
+ * overrides) so the on-disk file is portable and explicit.
+ *
+ */
 const jsoncHeader =
   '// ft-pipeline configuration\n// Precedence: FT_* env vars > this file > built-in defaults\n// Run "ft-pipeline config show" to see effective values.\n\n';
 
