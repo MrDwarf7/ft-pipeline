@@ -338,6 +338,12 @@ deno task ch:all         # fmt + check + lint (required after code changes)
 There is no `deno task migrate` / `deno task sync` shortcut for production commands. Use
 `ft-pipeline` after `deno task install`, or `deno task start <command>`.
 
+### Branches
+
+Day-to-day work lives on **`dev`**. CI (format / test / build / nightly zips) runs on pushes to
+`dev`. The GitHub **nightly** release + `nightly` branch are rewritten to that tip when Draft
+succeeds. **`main`** stays the stable/release line (and `v*` tags still make draft releases).
+
 ### Layout
 
 ```

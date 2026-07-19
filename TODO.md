@@ -111,8 +111,9 @@ as old B4 text claimed.
 ## Packaging / distro distribution (future)
 
 **Today:** `deno task install` drops a host binary on `XDG_BIN` / `XDG_BIN_HOME` / `~/.local/bin`
-(else leaves `dist/`). CI nightly publishes platform zips on the GitHub `nightly` release. That is
-enough for manual install; package-manager channels are **not** wired yet.
+(else leaves `dist/`). CI nightly publishes platform zips on the GitHub `nightly` release from the
+**`dev`** tip (tag + `heads/nightly` move with each successful Draft run on `dev`). That is enough
+for manual install; package-manager channels are **not** wired yet.
 
 **Wanted later (backlog -- not started):**
 

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - dev
     tags:
       - "v*"
   workflow_dispatch:
@@ -120,9 +121,10 @@ jobs:
           files: ${{ env.PROJECT_NAME }}-*
           generate_release_notes: true
 
+  # Nightly tracks the dev tip (day-to-day branch). main is for stable/tag releases.
   nightly:
     name: nightly-release
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/dev'
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -132,6 +134,7 @@ jobs:
         run: |
           {
             echo 'NIGHTLY_BODY<<EOF'
+            echo "Branch: dev"
             echo "From commit: ${GITHUB_SHA:0:8}"
             echo "Generated on: $(date -u +"%Y-%m-%d %H:%M") UTC"
             echo "Platforms: linux-x64, windows-x64, macos-arm64, macos-x64"
@@ -163,3 +166,19 @@ jobs:
           name: Nightly Build
           body: ${{ env.NIGHTLY_BODY }}
           target_commitish: ${{ github.sha }}
+
+      # Keep heads/nightly parked on the same SHA as the release (follows dev).
+      - name: Point nightly branch at this SHA
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/${{ github.repository }}/git/ref/heads/nightly" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/${{ github.repository }}/git/refs/heads/nightly" \
+              -f sha="${{ github.sha }}" \
+              -F force=true
+          else
+            gh api -X POST "repos/${{ github.repository }}/git/refs" \
+              -f ref="refs/heads/nightly" \
+              -f sha="${{ github.sha }}"
+          fi
