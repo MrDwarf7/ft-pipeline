@@ -1,51 +1,117 @@
 # ft-pipeline
 
-Turn X (Twitter) bookmarks into a local archive: plain-text Clippings, a SQLite database, and
-Obsidian-style markdown pages grouped by type and topic.
+Turn X (Twitter) bookmarks into a local archive: Clippings text, a SQLite DB, and Obsidian-style
+markdown pages by type and topic.
 
-You do not need to write TypeScript to use it. Install Deno, have `sqlite3` on your PATH, save
-cookies once for sync, and run a local LLM only if you want auto-classification.
+You do not need to write TypeScript. Install Deno, keep `sqlite3` on your PATH, save cookies once
+for sync, and run a local LLM only if you want auto-classification.
 
-## What it does
+## Contents
 
-1. **Sync** -- bookmarks from X into a local DB  
-2. **Extract** -- full text / articles into Clippings folders  
-3. **Merge** -- enriched clipping text back into the DB  
-4. **Classify** -- type + domain labels via a local LLM (skip if you do not care)  
-5. **Generate** -- one markdown page per bookmark in your vault  
-6. **Indexes** -- category / domain / entity pages (skip rewrite when unchanged)
+- [Agents and LLMs start here](#agents-and-llms-start-here) -- paste this repo at an agent
+- [For everyone](#for-everyone) -- what it does, what you need, first run
+- [CLI and technical](#cli-and-technical) -- commands, flags, config, env, cron, tests
 
-`full` runs that sequence. You can also run steps alone (e.g. only `sync` + `generate`).
+---
 
-## Requirements
+## Agents and LLMs start here
 
-| Need | For |
-| ---- | --- |
-| [Deno](https://deno.land/) 2.x | Running the CLI |
-| `sqlite3` CLI | Database |
-| X session cookies | `sync` / `full` |
-| Local OpenAI-compatible LLM on port 1234 | `classify` / full runs that include classify |
-| Network to xtracticle.com | `extract` |
+```
+╔══════════════════════════════════════════════════════════╗
+║  AGENTS AND LLMs START HERE                              ║
+║  Human said "make it work" with this repo? Read below.   ║
+╚══════════════════════════════════════════════════════════╝
+```
 
-Data defaults under `~/.config/ft-pipeline/` (DB, logs, cookies, config). Vault paths come from
-config (Clippings + wiki markdown).
+If someone sent you this README (or the repo link) and wants the pipeline running:
 
-## Quick start
+1. Load the project skill (same file, several paths):
+   - `.agents/.master/skills/ft-pipeline/SKILL.md` (canonical)
+   - or `.agents/skills/ft-pipeline/`, `.grok/skills/ft-pipeline/`, `.claude/skills/ft-pipeline/`
+2. Follow that skill for install, env, cookies, `full`, and cron + LLM.
+3. Editing code? Also read [AGENTS.md](./AGENTS.md) before changing TypeScript.
+4. Packaging layout for multi-agent skills: [`.agents/README.md`](./.agents/README.md).
+
+Minimal "get them unblocked" path once Deno + `sqlite3` exist:
+
+```bash
+deno run --allow-all src/main.ts migrate
+deno run --allow-all src/main.ts cookies extract   # interactive, once
+export FT_COOKIES_PATH="$HOME/.config/ft-pipeline/.sync-cookies.enc"
+export FT_PIPELINE_PASSWORD="..."                  # ask the human
+deno run --allow-all src/main.ts full --password "$FT_PIPELINE_PASSWORD"
+```
+
+Prefer `./dist/ft-pipeline` after `deno task build` for cron. There is no `deno task sync` /
+`deno task full` -- use the binary or `deno run`. Soft failures inside `full` (e.g. classify with no
+LLM) are logged; remaining steps still run.
+
+Humans who are not using an agent: skip this section and keep reading.
+
+---
+
+## For everyone
+
+### What you get
+
+Bookmarks leave the X app and land on your machine as:
+
+1. Rows in a local database
+2. Plain markdown Clippings (articles / posts / media)
+3. Wiki-style pages you can open in Obsidian (or any markdown vault)
+
+Optional: a local model tags each bookmark with a type (tool, tutorial, …) and a domain (ai-ml,
+security, …). Skip classify if you only want text and files.
+
+### The pipeline in plain English
+
+| Step     | What happens                                                          |
+| -------- | --------------------------------------------------------------------- |
+| Sync     | Pull bookmarks from X into SQLite                                     |
+| Extract  | Fetch full text via xtracticle into Clippings folders                 |
+| Merge    | Put the best clipping text back on each DB row                        |
+| Classify | Local LLM assigns type + domain (optional)                            |
+| Generate | One markdown page per bookmark under your wiki root                   |
+| Indexes  | Category / domain / entity index pages (skips rewrite when unchanged) |
+
+`full` runs that sequence. You can also run one step at a time.
+
+### What you need
+
+| Need                                     | Why                                            |
+| ---------------------------------------- | ---------------------------------------------- |
+| [Deno](https://deno.land/) 2.x           | Runs the CLI                                   |
+| `sqlite3` on PATH                        | Database                                       |
+| X session cookies                        | Only for sync / full                           |
+| Local OpenAI-compatible LLM on port 1234 | Only for classify (or full when classify runs) |
+| Network to xtracticle.com                | Extract                                        |
+
+Defaults live under `~/.config/ft-pipeline/` (DB, logs, encrypted cookies, config). Vault paths
+(Clippings + wiki) come from config; stock defaults point at `~/StoneVault/…` if you use that
+layout.
+
+### First run (copy-paste)
 
 ```bash
 git clone <this-repo> && cd ft-pipeline
 
+# schema
 deno run --allow-all src/main.ts migrate
-deno run --allow-all src/main.ts cookies extract   # one-time, interactive
+
+# one-time: encrypt browser cookies for X
+deno run --allow-all src/main.ts cookies extract
 
 export FT_COOKIES_PATH="$HOME/.config/ft-pipeline/.sync-cookies.enc"
 export FT_PIPELINE_PASSWORD="your-password"
 
-deno run --allow-all src/main.ts config init       # optional editable config
+# optional: write an editable config file
+deno run --allow-all src/main.ts config init
+
+# whole pipeline
 deno run --allow-all src/main.ts full --password "$FT_PIPELINE_PASSWORD"
 ```
 
-Compile if you want a single binary (handy for cron):
+Prefer a binary (cron-friendly):
 
 ```bash
 deno task build
@@ -53,7 +119,40 @@ deno task build
 ./dist/ft-pipeline full --password "$FT_PIPELINE_PASSWORD"
 ```
 
-## Commands
+### Day-to-day
+
+After setup you mostly care about:
+
+```bash
+# catch up bookmarks + refresh wiki
+./dist/ft-pipeline full --password "$FT_PIPELINE_PASSWORD"
+
+# or pieces
+./dist/ft-pipeline sync --password "$FT_PIPELINE_PASSWORD"
+./dist/ft-pipeline extract --skip-existing
+./dist/ft-pipeline generate
+./dist/ft-pipeline indexes
+```
+
+If classify fails because the model is down, `full` logs it and keeps going on the rest of the
+steps. Missing password or a dead DB still fail hard on that step.
+
+### Unattended runs
+
+Put the binary on cron with `FT_COOKIES_PATH` and `FT_PIPELINE_PASSWORD` set. For classify that
+should start the LLM when needed, use [`scripts/run-with-llm.sh`](./scripts/run-with-llm.sh)
+(details under [CLI and technical](#cron-and-the-llm-script)).
+
+### Agent skill
+
+See [Agents and LLMs start here](#agents-and-llms-start-here) for the banner, skill paths, and "make
+it work" checklist. Packaging: [`.agents/README.md`](./.agents/README.md).
+
+---
+
+## CLI and technical
+
+### Invocation
 
 ```bash
 deno run --allow-all src/main.ts <command> [options]
@@ -61,30 +160,44 @@ deno run --allow-all src/main.ts <command> [options]
 ./dist/ft-pipeline <command> [options]
 ```
 
-| Command | Result |
-| ------- | ------ |
-| `migrate` | Create or update the DB schema |
-| `cookies extract` / `check` | Encrypt cookies / verify the file |
-| `sync` | Pull bookmarks from X |
-| `extract` | Fill Clippings from xtracticle |
-| `merge` | Clipping text into the DB |
-| `classify` | LLM labels |
-| `generate` | Bookmark markdown pages |
-| `indexes` | Category / domain / entity indexes |
-| `config` | `show`, `file`, `init`, `set`, `migrate` |
-| `full` | Whole pipeline in order |
+`deno task start` is the same as `deno run --allow-all src/main.ts`.
+
+### Commands
+
+| Command           | Result                                                                 |
+| ----------------- | ---------------------------------------------------------------------- |
+| `migrate`         | Create / update DB schema (run once, safe to re-run)                   |
+| `cookies extract` | Interactive encrypt of X cookies                                       |
+| `cookies check`   | Verify the encrypted file exists / loads                               |
+| `sync`            | GraphQL pull from X into `pipeline.db`                                 |
+| `extract`         | xtracticle -> Clippings + DB extract fields                            |
+| `merge`           | Clipping body -> `clippings_text` on matching rows                     |
+| `classify`        | Local LLM type + domain labels                                         |
+| `generate`        | Bookmark markdown pages                                                |
+| `indexes`         | Category / domain / entity indexes                                     |
+| `config`          | `show`, `file`, `init`, `set`, `migrate`                               |
+| `full`            | migrate -> sync -> extract -> merge -> classify -> generate -> indexes |
+
+`full` is implemented and used in practice; it may not appear on `--help` until the schema lists it.
+Prefer the binary or `deno run … full` the same way as other commands.
+
+### Useful flags
 
 ```bash
-# Common flags
+./dist/ft-pipeline --help
+./dist/ft-pipeline config --help
+
 ./dist/ft-pipeline extract --skip-existing
 ./dist/ft-pipeline extract --dry-run --limit 10
 ./dist/ft-pipeline classify --dry-run --limit 10
 ./dist/ft-pipeline sync --password "$FT_PIPELINE_PASSWORD"
-./dist/ft-pipeline --help
-./dist/ft-pipeline config --help
+./dist/ft-pipeline -v full --password "$FT_PIPELINE_PASSWORD"
 ```
 
-## Config
+Global options (from root help) include `--cookies`, `--force`, `--config`, `--verbose` / `--quiet`,
+`--log`, `--format`, `--limit`.
+
+### Config
 
 File: `~/.config/ft-pipeline/config.jsonc`
 
@@ -97,29 +210,34 @@ File: `~/.config/ft-pipeline/config.jsonc`
 ./dist/ft-pipeline config --migrate    # same
 ```
 
-Highest wins: `FT_*` env vars, then the config file, then built-ins.
+Resolution order (highest wins):
 
-`maxExternalCallAttempts` (default 4) is the shared HTTP retry budget for X, xtracticle, and the
-LLM. Older files that still use `maxRetries` still load. On an interactive run you may be asked to
-migrate; cron never blocks on that prompt (`FT_NO_CONFIG_MIGRATE_PROMPT=1` disables it).
+1. `FT_*` environment variables
+2. Config file
+3. Built-in defaults (XDG paths + vault defaults)
 
-## Environment
+`maxExternalCallAttempts` (default 4) is the shared HTTP attempt budget for X, xtracticle, and the
+LLM (total tries, not "retries after first"). Older files that still say `maxRetries` still load.
+Interactive runs may prompt to rewrite the file; cron never blocks on that
+(`FT_NO_CONFIG_MIGRATE_PROMPT=1` turns the prompt off).
 
-| Variable | When | Purpose |
-| -------- | ---- | ------- |
-| `FT_COOKIES_PATH` | sync / full | Encrypted cookies path |
-| `FT_PIPELINE_PASSWORD` | sync / full | Cookie password (or `--password`) |
-| `FT_PIPELINE_DB_PATH` | optional | DB path override |
-| `FT_MARKDOWN_DIR` | optional | Wiki output root |
-| `FT_CLIPPINGS_BASE` | optional | Clippings root |
-| `FT_NO_HOUSEKEEPING` | optional | Skip log cleanup |
-| `FT_NO_CONFIG_MIGRATE_PROMPT` | optional | Never ask to rewrite legacy config keys |
+### Environment
 
-A `.env` under the config directory is loaded automatically when present.
+| Variable                      | When        | Purpose                           |
+| ----------------------------- | ----------- | --------------------------------- |
+| `FT_COOKIES_PATH`             | sync / full | Encrypted cookies path            |
+| `FT_PIPELINE_PASSWORD`        | sync / full | Cookie password (or `--password`) |
+| `FT_PIPELINE_DB_PATH`         | optional    | DB path override                  |
+| `FT_MARKDOWN_DIR`             | optional    | Wiki output root                  |
+| `FT_CLIPPINGS_BASE`           | optional    | Clippings root                    |
+| `FT_NO_HOUSEKEEPING`          | optional    | Skip log rotation cleanup         |
+| `FT_NO_CONFIG_MIGRATE_PROMPT` | optional    | Never ask to rewrite legacy keys  |
 
-## Cron and the LLM script
+A `.env` under the config directory is loaded when present.
 
-### Plain cron
+### Cron and the LLM script
+
+#### Plain cron
 
 ```bash
 0 10,16,2 * * * \
@@ -128,26 +246,22 @@ A `.env` under the config directory is loaded automatically when present.
   /path/to/ft-pipeline/dist/ft-pipeline full
 ```
 
-`full` logs soft step failures (e.g. classify when the model is down) and continues. Hard failures
-(missing password, no DB access) still stop that step.
+#### `scripts/run-with-llm.sh`
 
-### `scripts/run-with-llm.sh` (recommended for unattended classify)
+For unattended classify when the model server might be off:
 
-For crons (or agents) that should not babysit the model server:
-
-1. Detect "LLM connection refused" style failures  
-2. Start the server if it is not already up  
-3. Wait until `http://localhost:$LLM_PORT/v1/models` answers  
-4. Retry the pipeline command  
-5. Kill only a server **this script** started  
+1. Run the pipeline command
+2. If it looks like "LLM connection refused", start the server
+3. Wait until `http://localhost:$LLM_PORT/v1/models` answers
+4. Retry the command
+5. Kill only a server **this script** started
 
 ```bash
 chmod +x scripts/run-with-llm.sh
 
-# Default: PIPELINE=ft-pipeline, PIPELINE_CMD=full, LLM via llama-me -r on :1234
+# Defaults: PIPELINE=ft-pipeline, PIPELINE_CMD=full, LLM via llama-me -r on :1234
 ./scripts/run-with-llm.sh
 
-# Point at your binary and keep your own start command
 PIPELINE="/path/to/dist/ft-pipeline" \
 PIPELINE_CMD="full" \
 LLM_START_CMD="llama-me -r" \
@@ -156,53 +270,45 @@ LLM_PORT=1234 \
 ./scripts/run-with-llm.sh
 ```
 
-| Variable | Default | Meaning |
-| -------- | ------- | ------- |
-| `PIPELINE` | `ft-pipeline` | CLI binary (must be on `PATH` or absolute) |
-| `PIPELINE_CMD` | `full` | Subcommand |
-| `LLM_PROCESS` | `llama-server` | Exact name for `pgrep -x` |
-| `LLM_START_CMD` | `llama-me -r` | How to start the server |
-| `LLM_PORT` | `1234` | Readiness port |
-| `LLM_TIMEOUT` | `60` | Seconds to wait for readiness |
+| Variable        | Default        | Meaning                           |
+| --------------- | -------------- | --------------------------------- |
+| `PIPELINE`      | `ft-pipeline`  | Binary on `PATH` or absolute path |
+| `PIPELINE_CMD`  | `full`         | Subcommand                        |
+| `LLM_PROCESS`   | `llama-server` | Exact name for `pgrep -x`         |
+| `LLM_START_CMD` | `llama-me -r`  | How to start the server           |
+| `LLM_PORT`      | `1234`         | Readiness port                    |
+| `LLM_TIMEOUT`   | `60`           | Seconds to wait for readiness     |
 
-Put the script (or a wrapper that exports env) on crontab the same way you would call the binary.
-
-## For agents (Cursor / Grok / Claude / etc.)
-
-This repo ships a project skill at:
-
-```
-.grok/skills/ft-pipeline/SKILL.md
-```
-
-Point your agent at that skill (or open the repo so Grok picks it up). It covers binary vs
-`deno run`, cron + `run-with-llm.sh`, config migrate, and the usual footguns. Humans can ignore it
-and stay on this README.
-
-Longer conventions for contributors/agents: [AGENTS.md](./AGENTS.md).
-
-## Tests (developers)
+### Deno tasks (dev)
 
 ```bash
+deno task start          # CLI entry
+deno task build          # compile -> dist/ft-pipeline
 deno task test:unit
 deno task test:e2e
-deno task ch:all
+deno task ch:all         # fmt + check + lint (required after code changes)
 ```
 
-## Layout (short)
+There is no `deno task migrate` / `deno task sync` shortcut for production commands. Use the binary
+or `deno run --allow-all src/main.ts <command>`.
+
+### Layout
 
 ```
-src/main.ts              CLI entry
-src/config.ts            Paths, taxonomy, retries
-src/commands/            Pipeline steps + config
-src/extraction/          X GraphQL + xtracticle
-src/llm/                 Local OpenAI-compatible client
-src/utils/               db, http retry, logging, …
-scripts/run-with-llm.sh  Cron-friendly LLM lifecycle wrapper
-.grok/skills/ft-pipeline Agent skill pack
+src/main.ts                 CLI entry + dispatch
+src/config.ts               Paths, taxonomy, retries, config file
+src/cli-schema.tree.ts      Command/option tree (help + parse)
+src/commands/               Pipeline steps + config + cookies
+src/extraction/             X GraphQL + xtracticle
+src/llm/                    OpenAI-compatible local client
+src/utils/                  db, pipeline, http retry, logging, …
+scripts/run-with-llm.sh     Cron-friendly LLM lifecycle wrapper
+.agents/.master/skills/     Canonical agent skill pack
+.agents/{grok,claude,...}/  Symlinks to master (tool packaging)
+.grok/skills, .claude/skills  Discovery shims -> master
 ```
 
-## Inspiration
+### Inspiration
 
 Originally sparked by ideas around [fieldtheory](https://github.com/andrewfarah/fieldtheory). This
 project is a separate pipeline and database; you do not need that CLI installed.
