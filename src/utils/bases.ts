@@ -47,7 +47,6 @@ const appConfigDir = `${PATHS.config}/${APP_NAME}`;
 const appDataDir = `${PATHS.data}/${APP_NAME}`;
 const appCacheDir = `${PATHS.cache}/${APP_NAME}`;
 
-// ── Ensure directories exist ────────────────────────────────────
 // Both xdg-basedir and env-paths only return path strings.
 // Create app dirs on startup so downstream code can write without checks.
 await Promise.all(

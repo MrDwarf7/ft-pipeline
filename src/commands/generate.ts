@@ -1,5 +1,4 @@
 /** Generate bookmark .md files from pipeline.db */
-
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
@@ -57,8 +56,9 @@ const bookmarkTemplate: BookmarkTemplate = (b) => {
   const { yyyy, mm, dd, day } = toDateParts(b.posted_at);
   const dateUnderscore = `${yyyy}_${mm}_${dd}`;
 
-  // Derive a display title from the first line of content
-  // Strip any leading markdown heading markers so we don't get double `#` in the template
+  /* Derive a display title from the first line of content.
+   * Strip any leading markdown heading markers so we don't get double `#` in the template
+   */
   const firstLine = b.display_text
     .split("\n")[0]
     .replace(/^#+\s*/, "")

@@ -1,5 +1,4 @@
-// types.ts -- Command enum, Args interface, parse helpers
-
+/** Command enums, the Args interface, and CLI argument parsing helpers. */
 import { parseArgs } from "@std/cli/parse-args";
 import { getParseArgsConfig } from "./cli-schema.tree.ts";
 
@@ -29,7 +28,8 @@ export type ConfigSub = (typeof ConfigSub)[keyof typeof ConfigSub];
 
 /** Uniform contract for every dispatched command.
  *  The main dispatch extracts subcommand + rest from raw args ONCE and hands
- *  them in here -- leaf commands must never re-parse args._ themselves. */
+ *  them in here -- leaf commands must never re-parse args._ themselves.
+ */
 export interface CommandContext {
   args: Args;
   subcommand?: string;

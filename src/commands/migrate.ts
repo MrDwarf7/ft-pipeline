@@ -1,7 +1,6 @@
-// commands/migrate.ts -- Create/migrate our own pipeline database
-//
-// We own pipeline.db in /home/dwarf/.config/ft-pipeline/.
-
+/** Create/migrate our own pipeline database.
+ *  We own pipeline.db in /home/dwarf/.config/ft-pipeline/.
+ */
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, getPipelineDb } from "../utils/db.ts";

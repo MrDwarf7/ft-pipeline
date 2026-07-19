@@ -1,4 +1,6 @@
-// types.ts -- Shared types for extraction sources
+/**
+ * Shared types for extraction sources.
+ */
 
 export interface TweetData {
   id: string;

@@ -1,4 +1,4 @@
-// commands/classify-llm.ts -- LLM prompt, call, and response parsing for classification
+/** LLM prompt, call, and response parsing for classification. */
 
 import { DOMAINS, TYPES } from "../config.ts";
 import { type ConnectedLLM } from "../llm/index.ts";

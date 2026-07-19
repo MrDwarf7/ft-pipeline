@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// Zod schemas for GraphQL response validation
+/** Zod schemas for GraphQL response validation. */
 export const MediaSchema = z.object({
   type: z.string(),
   url: z.string().optional(),

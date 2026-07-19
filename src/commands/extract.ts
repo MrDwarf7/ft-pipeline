@@ -1,4 +1,4 @@
-// commands/extract.ts -- Extract articles via xtracticle + link to DB
+/** Extract articles via xtracticle + link to DB. */
 
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
@@ -53,7 +53,9 @@ interface Row {
 
 type ExtractResult = "extracted" | "skipped" | "failed";
 
-/** Normalize xtracticle media (could be array or {all, photos, mosaic} object) */
+/** Normalize xtracticle media (could be array or {all, photos, mosaic}
+ *  object).
+ */
 const normalizeMedia = (
   media: XtracticleResponse["tweets"][0]["media"],
 ): XtracticleMedia[] => {
@@ -71,7 +73,9 @@ type DateInfo = {
   dow: string;
 } | null;
 
-/** Parse Twitter date string (e.g. "Fri Aug 28 11:05:56 +0000 2020") or ISO date */
+/** Parse Twitter date string (e.g. "Fri Aug 28 11:05:56 +0000 2020") or ISO
+ *  date.
+ */
 const parseDate = (dateStr: string): DateInfo => {
   if (!dateStr) return null;
 
@@ -208,15 +212,15 @@ const classifyTweet = (
   const textLen = (tweet.text || "").length;
   const hasLongText = textLen >= CONFIG.minPostTextLength;
 
-  // Media only (short/no text, no article) → X-Media
+  // Media only (short/no text, no article) -> X-Media
   if (hasMedia && !hasArticle && !hasLongText) {
     return { dir: CONFIG.clippingDirs.media, type: "media" };
   }
-  // Article content blocks from xtracticle OR long text → X-Articles
+  // Article content blocks from xtracticle OR long text -> X-Articles
   if (hasArticle || hasLongText) {
     return { dir: CONFIG.clippingDirs.articles, type: "article" };
   }
-  // Short text, no article, no direct media → X-Posts
+  // Short text, no article, no direct media -> X-Posts
   return { dir: CONFIG.clippingDirs.posts, type: "post" };
 };
 
@@ -303,7 +307,9 @@ const buildMediaList = (
   return lines.length ? lines.join("\n\n") : "";
 };
 
-/** Extract image URLs from article content (cover + inline media_entities) */
+/** Extract image URLs from article content (cover + inline
+ *  media_entities).
+ */
 const extractArticleImages = (
   tweet: XtracticleResponse["tweets"][0],
 ): string[] => {
@@ -351,7 +357,9 @@ const extractArticleText = (article: unknown): string => {
     .join("\n\n");
 };
 
-/** Concatenate tweet text + article text -- either can be empty, both get captured if present */
+/** Concatenate tweet text + article text -- either can be empty, both get
+ *  captured if present.
+ */
 const getEffectiveText = (tweet: XtracticleResponse["tweets"][0]): string =>
   [tweet.text, extractArticleText(tweet.article)].filter(Boolean).join("\n\n");
 

@@ -1,5 +1,4 @@
 /** Generate category/domain index notes with hash-based caching */
-
 import { CONFIG, DOMAINS, TYPES } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, getPipelineDb } from "../utils/db.ts";

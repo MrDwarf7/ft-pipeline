@@ -1,5 +1,4 @@
 /** Merge Clippings enriched text back into DB */
-
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, getPipelineDb } from "../utils/db.ts";

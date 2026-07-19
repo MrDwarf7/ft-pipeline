@@ -1,5 +1,6 @@
-// commands/classify-db.ts -- DB operations for classification
-// Writes to our pipeline.db (NOT ft's bookmarks.db)
+/** DB operations for classification. Writes to our pipeline.db (NOT ft's
+ *  bookmarks.db).
+ */
 
 import { type Database } from "../utils/db.ts";
 import { logger } from "../utils/logger.ts";

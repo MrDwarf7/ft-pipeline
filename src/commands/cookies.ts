@@ -1,5 +1,4 @@
-// commands/cookies.ts -- Cookie extraction + encrypted storage
-
+/** Cookie extraction + encrypted storage. */
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 

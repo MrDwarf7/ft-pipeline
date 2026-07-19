@@ -1,5 +1,4 @@
-// help.ts -- Help text and usage output
-
+/** Help text and usage output. */
 import { logBlock } from "../utils/logger.ts";
 
 export const printScreen = (text: string): never => {

@@ -6,7 +6,6 @@
  * Usage:
  *   deno run --allow-all main.ts <command> [options]
  */
-
 import { assertEnvVars } from "./utils/env.ts";
 import { Command, parseCliArgs } from "./types.ts";
 import { printScreen } from "./commands/help.ts";

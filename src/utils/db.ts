@@ -73,8 +73,6 @@ const querySql = (dbPath: string, sql: string): Record<string, unknown>[] => {
   }
 };
 
-// -- Statement implementation --
-
 class Sqlite3Statement implements Statement {
   private dbPath: string;
   private sql: string;
@@ -102,8 +100,6 @@ class Sqlite3Statement implements Statement {
   }
 }
 
-// -- Database implementation --
-
 class Sqlite3Database implements Database {
   private dbPath: string;
 
@@ -123,8 +119,6 @@ class Sqlite3Database implements Database {
     logger.info("DB connection closed");
   }
 }
-
-// -- Singleton management --
 
 let dbInstance: Database | null = null;
 

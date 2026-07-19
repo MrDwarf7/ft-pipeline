@@ -1,6 +1,5 @@
 /** Recursive help-tree: data, resolvers, and rendering for the ft-pipeline CLI.
  *  Types live in cli-schema.types.ts. Requires noUncheckedIndexedAccess.
- *
  */
 
 import { APP_NAME } from "./consts.ts";
@@ -57,7 +56,6 @@ const walk = (node: CommandNode, ctx: WalkCtx): HelpLookup => {
  *  resolveHelp(ALL_OPTIONS, ["config"]) -> bin config --help
  *  resolveHelp(ALL_OPTIONS, ["config", "show"]) -> bin config show --help
  *  resolveHelp(ALL_OPTIONS, ["migrate", "oops"]) -> not found at "oops"
- *
  */
 export const resolveHelp = (
   root: HelpRoot,
@@ -85,13 +83,11 @@ export const resolveHelp = (
 };
 
 /** Type guard: only the root carries globalOptions.
- *
  */
 export const isHelpRoot = (node: HelpRoot | CommandNode): node is HelpRoot =>
   "globalOptions" in node;
 
 /** Every resolvable path (branches and leaves), for completions or exhaustive generation.
- *
  */
 export const listCommandPaths = (
   root: HelpRoot,
@@ -102,17 +98,14 @@ export const listCommandPaths = (
   ): readonly (readonly string[])[] => {
     if (node.subcommands === null) return [prefix];
     const children = Object.entries(node.subcommands).flatMap(([key, child]) =>
-      collect(child, [...prefix, key]),
+      collect(child, [...prefix, key])
     );
     return [prefix, ...children];
   };
-  return Object.entries(root.commands).flatMap(([key, node]) =>
-    collect(node, [key]),
-  );
+  return Object.entries(root.commands).flatMap(([key, node]) => collect(node, [key]));
 };
 
 /** Global + local options for a node, for rendering.
- *
  */
 export const flattenOptions = (
   root: HelpRoot,
@@ -125,13 +118,12 @@ export const flattenOptions = (
 /** Derive a parseArgs config from the option tree (single source of truth).
  *  Long flags become the option name; short flags become the alias. A present
  *  valueName means string, otherwise boolean. Defaults carry through.
- *
  */
 export const getParseArgsConfig = (): ParseArgsConfig => {
   const allOpts: OptionDef[] = [
     ...Object.values(ALL_OPTIONS.globalOptions),
     ...Object.values(ALL_OPTIONS.commands).flatMap((cmd) =>
-      "options" in cmd && cmd.options ? Object.values(cmd.options) : [],
+      "options" in cmd && cmd.options ? Object.values(cmd.options) : []
     ),
   ];
 
@@ -164,8 +156,7 @@ const renderOptionList = (
 ): void => {
   const specs = Object.values(opts);
   const labels = specs.map(optLabel);
-  const width =
-    (labels.length ? Math.max(...labels.map((l) => l.length)) : 0) + 2;
+  const width = (labels.length ? Math.max(...labels.map((l) => l.length)) : 0) + 2;
   specs.forEach((spec) => {
     const label = optLabel(spec);
     lines.push(`  ${label.padEnd(width)}${spec.description}`);
@@ -178,9 +169,7 @@ const renderOptionList = (
 /** Render a resolved help lookup to a printable string. */
 export const renderHelp = (root: HelpRoot, lookup: HelpLookup): string => {
   if (!lookup.found) {
-    const avail = lookup.available.length
-      ? lookup.available.join(", ")
-      : "(none)";
+    const avail = lookup.available.length ? lookup.available.join(", ") : "(none)";
     return [`Unknown command: ${lookup.failedAt}`, `Available: ${avail}`].join(
       "\n",
     );
@@ -193,8 +182,7 @@ export const renderHelp = (root: HelpRoot, lookup: HelpLookup): string => {
 
   if (isHelpRoot(node)) {
     lines.push(`Usage: ${root.name} <command> [options]`, "", "Commands:");
-    const width =
-      Math.max(...Object.values(root.commands).map((c) => c.name.length)) + 2;
+    const width = Math.max(...Object.values(root.commands).map((c) => c.name.length)) + 2;
     Object.entries(root.commands).forEach(([name, cmd]) => {
       lines.push(`  ${name.padEnd(width)}${cmd.description}`);
     });
@@ -224,7 +212,6 @@ export const renderHelp = (root: HelpRoot, lookup: HelpLookup): string => {
 
 /** Pull the positional command path from argv up to the first -h/--help.
  *  Returns null when no help flag is present.
- *
  */
 const collectHelpPath = (argv: string[]): string[] | null => {
   const idx = argv.findIndex((t) => t === "-h" || t === "--help");
@@ -232,7 +219,6 @@ const collectHelpPath = (argv: string[]): string[] | null => {
 };
 
 /** Resolve + render the help screen for argv, or null if no -h/--help.
- *
  */
 export const findHelpScreen = (argv: string[]): string | null => {
   const path = collectHelpPath(argv);

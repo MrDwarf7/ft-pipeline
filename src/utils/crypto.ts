@@ -1,4 +1,4 @@
-// utils/crypto.ts -- Cookie encryption/decryption using Web Crypto API
+/** Cookie encryption/decryption using Web Crypto API */
 
 const ALGORITHM = "AES-GCM";
 const KEY_LENGTH = 256;

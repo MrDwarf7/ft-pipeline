@@ -1,4 +1,4 @@
-// commands/classify.ts -- LLM classification via local Gemma (orchestrator)
+/** LLM classification via local Gemma (orchestrator). */
 
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";

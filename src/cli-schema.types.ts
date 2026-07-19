@@ -1,7 +1,6 @@
 /**
  * Help-schema types -- pure type layer for the recursive help tree.
  * Data and resolvers live in cli-schema.tree.ts.
- *
  */
 export interface OptionDef {
   readonly flags: readonly string[]; // ["-v", "--verbose"] -- all forms incl. aliases
@@ -61,7 +60,6 @@ interface CommandNodeBase {
 
 /** Terminal command -- nothing further underneath. `subcommands: null` is the
  *  discriminant and MUST be written explicitly on every leaf (see note above).
- *
  */
 export interface LeafCommand extends CommandNodeBase {
   readonly subcommands: null;
@@ -70,7 +68,6 @@ export interface LeafCommand extends CommandNodeBase {
 /** Command that fans out to more commands. `subcommands` is REQUIRED (not
  *  optional) so a branch missing its subcommand map fails to typecheck instead
  *  of silently resolving as a dead leaf (see note above).
- *
  */
 export interface BranchCommand extends CommandNodeBase {
   readonly subcommands: Readonly<Record<string, CommandNode>>;
@@ -79,7 +76,6 @@ export interface BranchCommand extends CommandNodeBase {
 /** Self-referential union covering every depth. Discriminated by `subcommands`
  *  (null = leaf, Record = branch). Neither variant may make `subcommands`
  *  optional -- see the note above for why.
- *
  */
 export type CommandNode = LeafCommand | BranchCommand;
 
@@ -102,14 +98,14 @@ export interface HelpRoot {
 
 export type HelpLookup =
   | {
-      readonly found: true;
-      readonly node: HelpRoot | CommandNode;
-      readonly path: readonly string[];
-    }
+    readonly found: true;
+    readonly node: HelpRoot | CommandNode;
+    readonly path: readonly string[];
+  }
   | {
-      readonly found: false;
-      readonly path: readonly string[];
-      readonly failedAt: string;
-      /** Valid keys at the failure point. Empty when the parent was a leaf. */
-      readonly available: readonly string[];
-    };
+    readonly found: false;
+    readonly path: readonly string[];
+    readonly failedAt: string;
+    /** Valid keys at the failure point. Empty when the parent was a leaf. */
+    readonly available: readonly string[];
+  };

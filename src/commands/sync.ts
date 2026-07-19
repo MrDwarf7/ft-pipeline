@@ -1,6 +1,6 @@
-// commands/sync.ts -- Sync bookmarks from X via our own GraphQL client
-// Replaces shelling out to ft CLI
-
+/** Sync bookmarks from X via our own GraphQL client.
+ *  Replaces shelling out to ft CLI.
+ */
 import { checkCookies, getCookies } from "./cookies.ts";
 import { logger } from "../utils/logger.ts";
 import { getPipelineDb } from "../utils/db.ts";

@@ -1,4 +1,4 @@
-// utils/frontmatter.ts -- Shared frontmatter parser
+/** Shared frontmatter parser */
 
 export interface Frontmatter {
   [key: string]: string;

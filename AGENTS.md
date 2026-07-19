@@ -15,17 +15,16 @@ regressions.
   banned from `.ts` files. Use plain ASCII: `--` for dashes, `'` and `"` for quotes.
 - **Exception:** Unicode is allowed inside template strings that produce user-facing output
   (markdown, wiki pages, log messages displayed to humans).
-- **Keep comments lean.** Explain _why_, not _what_. The code shows what it does; a comment
-  explains why a choice was made or why it must stay that way. If the code is self-evident,
-  don't comment.
+- **Keep comments lean.** Explain _why_, not _what_. The code shows what it does; a comment explains
+  why a choice was made or why it must stay that way. If the code is self-evident, don't comment.
 - **No section headers in comments.** Don't use `-- Pure helpers --` or similar banners.
-- **Block comments that are NOT docs use `/* */` (single star).** Do not use consecutive `//`
-  lines as a substitute for a block comment.
+- **Block comments that are NOT docs use `/* */` (single star).** Do not use consecutive `//` lines
+  as a substitute for a block comment.
 
 ### Doc comments (`/** */`, double star) -- the form is enforced
 
-A doc comment sits directly above the symbol it describes (interface, type, function, const,
-method, attribute). Two valid shapes:
+A doc comment sits directly above the symbol it describes (interface, type, function, const, method,
+attribute). Two valid shapes:
 
 **Block form** (multi-line, or one long thought). Pattern:
 
@@ -40,7 +39,9 @@ export interface Example { ... }
 Rules:
 - Open with `/**`. The first text may follow on the same line or start on the next line.
 - Every continuation line begins with ` * ` (space, star, space).
-- The text MUST end with a blank doc line: a ` *` line with nothing after the star.
+- An optional blank doc line (` *` with nothing after the star) MAY sit before the closer.
+  NOTE: `deno fmt` strips that blank line -- so its ABSENCE after formatting is correct, not a
+  violation. Do not add it back after fmt, and do not treat its absence as non-conformant.
 - The comment closes on its own line with ` */`.
 - The very next line after ` */` is the documented symbol -- no blank line between the closer
   and the symbol.
@@ -53,29 +54,30 @@ readonly available: readonly string[];
 ```
 
 Rules:
-- Allowed only when the doc is a single short sentence. "Short" = under a reasonable length,
-  judged in this order: the project's average line length, then the formatter's configured max
-  width, then "noticeably shorter than that."
-- Place it on its own line directly above the symbol, or inline on the same line as the symbol
-  it documents.
+
+- Allowed only when the doc is a single short sentence. "Short" = under a reasonable length, judged
+  in this order: the project's average line length, then the formatter's configured max width, then
+  "noticeably shorter than that."
+- Place it on its own line directly above the symbol, or inline on the same line as the symbol it
+  documents.
 
 Canonical examples live in `src/cli-schema.types.ts`: the `LeafCommand` doc (block form) and the
 `HelpLookup.available` doc (single-line form).
 
 ### File headers
 
-A file's leading doc comment uses the same two shapes: a single-line `/** ... */` when short, or
-the block form when it needs more than one line to say what the file is/does. Keep it to what the
-file is and does -- not a novel.
+A file's leading doc comment uses the same two shapes: a single-line `/** ... */` when short, or the
+block form when it needs more than one line to say what the file is/does. Keep it to what the file
+is and does -- not a novel.
 
 ### Exempt from the doc form
 
 - **Notable comments** (TODO, HACK, BUG, TEST, FIXME, etc.) are not doc comments. They use the
-  single-star block (`/* TODO: ... */`) or `// TODO: ` and follow their own marker pattern. They
-  do not need to wrap in the block form above.
+  single-star block (`/* TODO: ... */`) or `// TODO:` and follow their own marker pattern. They do
+  not need to wrap in the block form above.
 - **Semantic comments** -- a comment whose only job is to force a layout choice (e.g. force an
-  array/object to wrap on purpose, or mark an intentional structure) -- are also exempt. Use `//`
-  or `/* */` as the situation needs.
+  array/object to wrap on purpose, or mark an intentional structure) -- are also exempt. Use `//` or
+  `/* */` as the situation needs.
 
 ## What This Is
 

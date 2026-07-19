@@ -5,7 +5,6 @@
  *   ft-pipeline config init          Write defaults to the file (overwrites)
  *   ft-pipeline config set <k> <v>   Set a top-level key (int/number parsed)
  */
-
 import { type CommandContext, ConfigSub } from "../types.ts";
 import { logger } from "../utils/logger.ts";
 import {
