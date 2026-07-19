@@ -40,14 +40,15 @@ const readClippings = async (): Promise<Map<string, ClippingEntry>> => {
         if (!body || body.trim().length === 0) return null;
 
         // Priority: articles > posts > media (richest content wins)
+        const type = fm.type ?? "post";
         const existing = clippings.get(tweetId);
-        const newRank = TYPE_RANK[fm.type] || 0;
+        const newRank = TYPE_RANK[type] || 0;
         const existingRank = existing ? TYPE_RANK[existing.type] || 0 : 0;
 
         if (!existing || newRank > existingRank) {
           clippings.set(tweetId, {
             body: body.slice(0, 5000), // Cap at 5000 chars
-            type: fm.type,
+            type,
           });
         }
         return null;

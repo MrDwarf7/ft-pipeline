@@ -43,14 +43,13 @@ type BookmarkTemplate = (data: BookmarkData) => string;
 
 const bookmarkTemplate: BookmarkTemplate = (b) => {
   const { parts } = parseDate(b.posted_at);
-  const { yyyy, mm, dd, day } = parts;
-  const dateUnderscore = `${yyyy}_${mm}_${dd}`;
+  const { year, month, day } = parts;
+  const dateUnderscore = `${year}_${month}_${day}`;
 
   /* Derive a display title from the first line of content.
    * Strip any leading markdown heading markers so we don't get double `#` in the template
    */
-  const firstLine = b.display_text
-    .split("\n")[0]
+  const firstLine = (b.display_text.split("\n")[0] ?? "")
     .replace(/^#+\s*/, "")
     .trim()
     .slice(0, 120);
@@ -81,7 +80,7 @@ const bookmarkTemplate: BookmarkTemplate = (b) => {
     `- **Author:** [[entities/${b.author_handle}]]`,
     `- **Category:** [[categories/${b.primary_type || "unclassified"}]]`,
     `- **Domain:** [[domains/${b.primary_domain || "uncategorized"}]]`,
-    `- **Posted:** ${yyyy}-${mm}-${dd}`,
+    `- **Posted:** ${year}-${month}-${day}`,
     `- **Original:** [View on X](${b.url})`,
     typeLinks.length > 1 ? `- **All types:** ${typeLinks.join(", ")}` : "",
     domainLinks.length > 1 ? `- **All domains:** ${domainLinks.join(", ")}` : "",
@@ -99,9 +98,9 @@ const bookmarkTemplate: BookmarkTemplate = (b) => {
 
 const buildFilename = (b: BookmarkData): string => {
   const { parts } = parseDate(b.posted_at);
-  const { yyyy, mm, dd, day } = parts;
+  const { year, month, day } = parts;
   const slug = slugify(b.display_text.slice(0, 80));
-  return `${yyyy}_${mm}_${dd}-${day}-${b.author_handle}-${slug}.md`;
+  return `${year}_${month}_${day}-${day}-${b.author_handle}-${slug}.md`;
 };
 
 const fetchAllBookmarks = (): BookmarkData[] => {

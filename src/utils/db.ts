@@ -14,22 +14,22 @@ export interface Statement {
   all<T = Record<string, unknown>>(...params: (string | number | null)[]): T[];
 }
 
-// Escape a value for safe inclusion in a SQL string
+/** Escape a value for safe inclusion in a SQL string. */
 const escapeValue = (val: string | number | null): string => {
   if (val === null) return "NULL";
   if (typeof val === "number") return String(val);
   return `'${val.replace(/'/g, "''")}'`;
 };
 
-// Replace positional ? placeholders with escaped values
+/** Replace positional ? placeholders with escaped values. */
 const interpolate = (
   sql: string,
   params: (string | number | null)[],
 ): string => {
-  let idx = 0;
+  const it = params[Symbol.iterator]();
   return sql.replace(/\?/g, () => {
-    if (idx >= params.length) return "?";
-    return escapeValue(params[idx++]);
+    const nxt = it.next();
+    return nxt.done ? "?" : escapeValue(nxt.value);
   });
 };
 

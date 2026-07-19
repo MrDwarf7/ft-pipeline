@@ -43,6 +43,13 @@ interface XtracticleResponse {
   }>;
 }
 
+/** One tweet element (array element type -- defined once, see getTweet). */
+type Tweet = XtracticleResponse["tweets"][number];
+
+/** Safe tweet access. Centralizes the index-lookup so callers never index
+ *  tweets[] inline (noUncheckedIndexedAccess makes that T | undefined). */
+const getTweet = (data: XtracticleResponse, i = 0): Tweet | null => data.tweets[i] ?? null;
+
 interface Row {
   tweet_id: string;
   url: string;
@@ -58,7 +65,7 @@ type ExtractResult = "extracted" | "skipped" | "failed";
  *  object).
  */
 const normalizeMedia = (
-  media: XtracticleResponse["tweets"][0]["media"],
+  media: Tweet["media"],
 ): XtracticleMedia[] => {
   if (!media) return [];
   if (Array.isArray(media)) return media;
@@ -68,7 +75,7 @@ const normalizeMedia = (
 };
 
 /** Build rev-iso filename: YYYY_MM_DD-Dow-@handle-slug-title.md */
-const buildFilename = (tweet: XtracticleResponse["tweets"][0]): string => {
+const buildFilename = (tweet: Tweet): string => {
   const { ok, parts } = parseDate(tweet.created_at);
   const handle = `@${tweet.author.screen_name}`;
   const titleSlug = slug(tweet.text.slice(0, 50)) || tweet.id;
@@ -151,7 +158,7 @@ const findExistingClipping = async (
 };
 
 const classifyTweet = (
-  tweet: XtracticleResponse["tweets"][0],
+  tweet: Tweet,
 ): { dir: string; type: string } => {
   const mediaArray = normalizeMedia(tweet.media);
   const hasMedia = mediaArray.length > 0;
@@ -176,7 +183,7 @@ const classifyTweet = (
 };
 
 const buildFrontmatter = (
-  tweet: XtracticleResponse["tweets"][0],
+  tweet: Tweet,
   type: string,
 ): string => {
   const directTypes = [
@@ -235,7 +242,7 @@ const mediaItemToMarkdown = (m: XtracticleMedia): string | null => {
 };
 
 const buildMediaList = (
-  media: XtracticleResponse["tweets"][0]["media"],
+  media: Tweet["media"],
   articleImages: string[],
 ): string => {
   const lines: string[] = [];
@@ -262,7 +269,7 @@ const buildMediaList = (
  *  media_entities).
  */
 const extractArticleImages = (
-  tweet: XtracticleResponse["tweets"][0],
+  tweet: Tweet,
 ): string[] => {
   const urls: string[] = [];
 
@@ -311,11 +318,11 @@ const extractArticleText = (article: unknown): string => {
 /** Concatenate tweet text + article text -- either can be empty, both get
  *  captured if present.
  */
-const getEffectiveText = (tweet: XtracticleResponse["tweets"][0]): string =>
+const getEffectiveText = (tweet: Tweet): string =>
   [tweet.text, extractArticleText(tweet.article)].filter(Boolean).join("\n\n");
 
 const buildClippingContent = (
-  tweet: XtracticleResponse["tweets"][0],
+  tweet: Tweet,
   type: string,
 ): string => {
   const text = getEffectiveText(tweet);
@@ -338,9 +345,8 @@ const buildClippingContent = (
 };
 
 const saveClipping = async (
-  data: XtracticleResponse,
+  tweet: Tweet,
 ): Promise<string | null> => {
-  const tweet = data.tweets[0];
   const { dir, type } = classifyTweet(tweet);
   const filename = buildFilename(tweet);
   const path = `${CONFIG.clippingsBase}/${dir}/${filename}`;
@@ -382,7 +388,14 @@ const extractSingle = async (
     };
   }
 
-  const tweet = data.tweets[0];
+  const tweet = getTweet(data);
+  if (!tweet) {
+    return {
+      tweetId: row.tweet_id,
+      clippingPath: null,
+      extractStatus: "empty",
+    };
+  }
   const effectiveText = getEffectiveText(tweet);
   if (!effectiveText || effectiveText.trim().length === 0) {
     logger.info("xtracticle returned empty text -- skipping", {
@@ -396,7 +409,7 @@ const extractSingle = async (
     };
   }
 
-  const clippingPath = await saveClipping(data);
+  const clippingPath = await saveClipping(tweet);
   if (clippingPath) {
     logger.info("extracted clipping", {
       tweet_id: row.tweet_id,
