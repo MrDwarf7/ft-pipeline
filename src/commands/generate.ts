@@ -2,6 +2,7 @@
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
+import { parseDate } from "../utils/datetime.ts";
 
 interface BookmarkData {
   tweet_id: string;
@@ -27,18 +28,6 @@ const slugify = (text: string, maxLen = 60): string =>
     .replace(/^-|-$/g, "")
     .slice(0, maxLen);
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-const toDateParts = (
-  iso: string,
-): { yyyy: string; mm: string; dd: string; day: string } => {
-  const d = new Date(iso);
-  const yyyy = String(d.getFullYear());
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return { yyyy, mm, dd, day: DAY_NAMES[d.getDay()] };
-};
-
 const safeJsonArr = (raw: string | null): string[] => {
   if (!raw) return [];
   try {
@@ -53,7 +42,8 @@ const safeJsonArr = (raw: string | null): string[] => {
 type BookmarkTemplate = (data: BookmarkData) => string;
 
 const bookmarkTemplate: BookmarkTemplate = (b) => {
-  const { yyyy, mm, dd, day } = toDateParts(b.posted_at);
+  const { parts } = parseDate(b.posted_at);
+  const { yyyy, mm, dd, day } = parts;
   const dateUnderscore = `${yyyy}_${mm}_${dd}`;
 
   /* Derive a display title from the first line of content.
@@ -108,7 +98,8 @@ const bookmarkTemplate: BookmarkTemplate = (b) => {
 };
 
 const buildFilename = (b: BookmarkData): string => {
-  const { yyyy, mm, dd, day } = toDateParts(b.posted_at);
+  const { parts } = parseDate(b.posted_at);
+  const { yyyy, mm, dd, day } = parts;
   const slug = slugify(b.display_text.slice(0, 80));
   return `${yyyy}_${mm}_${dd}-${day}-${b.author_handle}-${slug}.md`;
 };

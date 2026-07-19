@@ -20,7 +20,7 @@ export const runMigrate = (): void => {
     db.exec("DROP TABLE IF EXISTS bookmarks");
   }
 
-  // Migration: add extract_status if missing (20 → 21 columns)
+  // Migration: add extract_status if missing (20 -> 21 columns)
   if (
     existingCols.length === 20 &&
     !existingCols.some(

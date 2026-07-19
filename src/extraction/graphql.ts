@@ -106,7 +106,7 @@ const parseTweet = (tweetResult: Record<string, unknown>): TweetData | null => {
   const tweet = result.data.tweet;
   const legacy = tweet.legacy;
 
-  // Flatten/transform from nested GraphQL shape → our TweetData
+  // Flatten/transform from nested GraphQL shape -> our TweetData
   const authorResult = tweet.core.user_results.result;
   const authorCore = authorResult.core;
   const authorLegacy = authorResult.legacy;

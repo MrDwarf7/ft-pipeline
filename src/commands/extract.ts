@@ -4,6 +4,7 @@ import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
 import type { Database } from "../utils/db.ts";
+import { parseDate } from "../utils/datetime.ts";
 
 interface ExtractOptions {
   dryRun?: boolean;
@@ -66,64 +67,14 @@ const normalizeMedia = (
   return [];
 };
 
-type DateInfo = {
-  year: string;
-  month: string;
-  day: string;
-  dow: string;
-} | null;
-
-/** Parse Twitter date string (e.g. "Fri Aug 28 11:05:56 +0000 2020") or ISO
- *  date.
- */
-const parseDate = (dateStr: string): DateInfo => {
-  if (!dateStr) return null;
-
-  // ISO format: "2024-07-17" or "2024-07-17T..."
-  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-    const year = dateStr.slice(0, 4);
-    const month = dateStr.slice(5, 7);
-    const day = dateStr.slice(8, 10);
-    const dowNum = new Date(Date.UTC(+year, +month - 1, +day)).getUTCDay();
-    const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dowNum];
-    return { year, month, day, dow };
-  }
-
-  // Twitter format: "Fri Aug 28 11:05:56 +0000 2020"
-  const match = dateStr.match(
-    /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+\d{2}:\d{2}:\d{2}\s+[+\-]\d{4}\s+(\d{4})$/,
-  );
-  if (match) {
-    const [, dow, monthStr, day, year] = match;
-    const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    const month = String(monthNames.indexOf(monthStr) + 1).padStart(2, "0");
-    return { year, month, day: day.padStart(2, "0"), dow };
-  }
-
-  return null;
-};
-
 /** Build rev-iso filename: YYYY_MM_DD-Dow-@handle-slug-title.md */
 const buildFilename = (tweet: XtracticleResponse["tweets"][0]): string => {
-  const dateInfo = parseDate(tweet.created_at);
+  const { ok, parts } = parseDate(tweet.created_at);
   const handle = `@${tweet.author.screen_name}`;
   const titleSlug = slug(tweet.text.slice(0, 50)) || tweet.id;
 
-  if (dateInfo) {
-    return `${dateInfo.year}_${dateInfo.month}_${dateInfo.day}-${dateInfo.dow}-${handle}-${titleSlug}.md`;
+  if (ok) {
+    return `${parts.year}_${parts.month}_${parts.day}-${parts.dow}-${handle}-${titleSlug}.md`;
   }
   return `undated-${handle}-${titleSlug}.md`;
 };

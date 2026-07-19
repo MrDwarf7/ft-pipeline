@@ -37,14 +37,15 @@ export interface Example { ... }
 ```
 
 Rules:
+
 - Open with `/**`. The first text may follow on the same line or start on the next line.
-- Every continuation line begins with ` * ` (space, star, space).
-- An optional blank doc line (` *` with nothing after the star) MAY sit before the closer.
-  NOTE: `deno fmt` strips that blank line -- so its ABSENCE after formatting is correct, not a
-  violation. Do not add it back after fmt, and do not treat its absence as non-conformant.
-- The comment closes on its own line with ` */`.
-- The very next line after ` */` is the documented symbol -- no blank line between the closer
-  and the symbol.
+- Every continuation line begins with `*` (space, star, space).
+- An optional blank doc line (`*` with nothing after the star) MAY sit before the closer. NOTE:
+  `deno fmt` strips that blank line -- so its ABSENCE after formatting is correct, not a violation.
+  Do not add it back after fmt, and do not treat its absence as non-conformant.
+- The comment closes on its own line with `*/`.
+- The very next line after `*/` is the documented symbol -- no blank line between the closer and the
+  symbol.
 
 **Single-line form.** `/**` and `*/` on the same line:
 

@@ -2,6 +2,7 @@
 import { CONFIG, DOMAINS, TYPES } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
+import { parseDate } from "../utils/datetime.ts";
 import type { Database } from "../utils/db.ts";
 import { needsUpdate } from "../utils/hash.ts";
 
@@ -46,7 +47,7 @@ const groupBy = <T>(
   );
 
 const formatBookmarkLine = (b: BookmarkEntry, linkType: LinkType): string => {
-  const date = b.posted_at ? new Date(b.posted_at).toISOString().split("T")[0] : "unknown";
+  const date = parseDate(b.posted_at).parts.iso.split("T")[0];
   const linkTarget = linkType === "category" ? b.primary_type : b.primary_domain;
   const textPreview = b.display_text.length > 120
     ? b.display_text.slice(0, 120) + "..."
