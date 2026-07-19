@@ -1,4 +1,4 @@
-/** GraphQL client for X bookmarks API. GET + URLSearchParams, matches fieldtheory-cli. */
+/** GraphQL client for X bookmarks API. GET + URLSearchParams; retries via http.ts. */
 
 import type { TweetData } from "./types.ts";
 import { pooledMap } from "@std/async/pool";
@@ -8,8 +8,11 @@ import type {
   FetchedOneSource,
   UncheckedSource,
 } from "./index.ts";
-import { TweetDataSchema } from "./schema.ts";
+import { parseResponse } from "./parse.ts";
+import { BookmarksResponseSchema } from "./schema.ts";
 import { logger } from "./../utils/logger.ts";
+import { fetchWithRetry, type RetryPolicy } from "./../utils/http.ts";
+import { CONFIG } from "./../config.ts";
 
 const BOOKMARKS_QUERY_ID = "Z9GWmP0kP2dajyckAaDUBw";
 const BOOKMARKS_OPERATION = "Bookmarks";
@@ -41,6 +44,21 @@ const GRAPHQL_FEATURES = {
   responsive_web_media_download_video_enabled: false,
 };
 
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/** maxRetries is retries after the first try; RetryPolicy wants total attempts. */
+const graphqlRetryPolicy = (): RetryPolicy => ({
+  maxAttempts: CONFIG.maxRetries + 1,
+  baseDelayMs: CONFIG.retryBaseMs,
+  jitter: true,
+  retryOn: [500, 502, 503],
+  fetch: globalThis.fetch,
+  sleep,
+});
+
 const buildUrl = (cursor: string | undefined, count: number): string => {
   const variables: Record<string, unknown> = { count };
   if (cursor) variables.cursor = cursor;
@@ -53,7 +71,7 @@ const buildUrl = (cursor: string | undefined, count: number): string => {
 
 const buildHeaders = (
   csrfToken: string,
-  cookieHeader?: string,
+  cookieHeader: string | undefined,
 ): Record<string, string> => ({
   authorization: `Bearer ${X_PUBLIC_BEARER}`,
   "x-csrf-token": csrfToken,
@@ -70,26 +88,31 @@ const validateConnectivity = async (
   headers: Record<string, string>,
 ): Promise<void> => {
   // Don't use HEAD -- X's GraphQL endpoint rejects it with 405
-  const resp = await fetch(url, { headers });
+  const resp = await fetchWithRetry(
+    { input: url, init: { headers } },
+    graphqlRetryPolicy(),
+  );
 
-  // Check for stale-auth response (200 with errors but no data)
   if (resp.ok) {
     const text = await resp.text().catch(() => "");
     try {
-      const parsed = JSON.parse(text);
-      const hasErrors = Array.isArray(parsed.errors) && parsed.errors.length > 0;
-      const hasNoData = !parsed.data;
-      if (hasErrors && hasNoData) {
-        const messages = parsed.errors
-          .map((e: Record<string, unknown>) => e.message)
-          .join("; ");
-        throw new Error(`GraphQL API auth error: ${messages}`);
+      const parsed: unknown = JSON.parse(text);
+      const envelope = BookmarksResponseSchema.safeParse(parsed);
+      if (envelope.success) {
+        const gqlErrors = envelope.data.errors;
+        const hasErrors = Array.isArray(gqlErrors) && gqlErrors.length > 0;
+        const hasNoData = envelope.data.data === null ||
+          envelope.data.data === undefined;
+        if (hasErrors && hasNoData && gqlErrors !== undefined) {
+          const messages = gqlErrors.map((e) => e.message).join("; ");
+          throw new Error(`GraphQL API auth error: ${messages}`);
+        }
       }
     } catch (err) {
       if (err instanceof SyntaxError) {
-        // Not JSON -- body might be HTML error page, just check status
+        // Not JSON -- body might be HTML error page; status check below
       } else {
-        throw err; // rethrow our parsed auth error
+        throw err;
       }
     }
   }
@@ -99,177 +122,40 @@ const validateConnectivity = async (
 
 const jitter = (): Promise<void> => new Promise((r) => setTimeout(r, 500 + Math.random() * 1000));
 
-const parseTweet = (tweetResult: Record<string, unknown>): TweetData | null => {
-  const result = TweetDataSchema.safeParse(tweetResult);
-  if (!result.success) return null;
-
-  const tweet = result.data.tweet;
-  const legacy = tweet.legacy;
-
-  // Flatten/transform from nested GraphQL shape -> our TweetData
-  const authorResult = tweet.core.user_results.result;
-  const authorCore = authorResult.core;
-  const authorLegacy = authorResult.legacy;
-
-  const mediaEntities = legacy.extended_entities?.media ?? legacy.entities?.media ?? [];
-  const media = mediaEntities.map((m) => ({
-    type: m.type,
-    url: m.media_url_https ?? m.media_url ?? "",
-    original_img_url: m.media_info?.original_img_url ?? "",
-  }));
-
-  const urlEntities = legacy.entities?.urls ?? [];
-  const links = urlEntities
-    .map((u) => u.expanded_url)
-    .filter((u): u is string => typeof u === "string" && !u.includes("t.co"));
-
-  const noteText = tweet.note_tweet?.note_tweet_results?.result?.text;
-  const text = noteText ?? legacy.full_text ?? legacy.text ?? "";
-
-  return {
-    id: legacy.id_str,
-    text,
-    author: {
-      screen_name: authorCore.screen_name ?? authorLegacy?.screen_name ?? "",
-      name: authorCore.name ?? authorLegacy?.name ?? "",
-    },
-    created_at: legacy.created_at ?? "",
-    media: { all: media },
-    links_json: JSON.stringify(links),
-    engagement: {
-      likeCount: legacy.favorite_count,
-      repostCount: legacy.retweet_count,
-      replyCount: legacy.reply_count,
-      quoteCount: legacy.quote_count,
-      bookmarkCount: legacy.bookmark_count,
-      viewCount: tweet.views ? Number(tweet.views.count) : undefined,
-    },
-  };
-};
-
-const parseResponse = (
-  json: Record<string, unknown>,
-): { records: TweetData[]; nextCursor?: string } => {
-  // Match fieldtheory-cli exactly: json.data.bookmark_timeline_v2.timeline.instructions
-  const data = json.data as Record<string, unknown> | undefined;
-
-  // Diagnostic: check expected structure and log if something's off
-  if (!data) {
-    const hasErrors = Array.isArray(json.errors) && (json.errors as unknown[]).length > 0;
-    if (hasErrors) {
-      const msgs = (json.errors as unknown[])
-        .map((e: unknown) => (e as Record<string, unknown>).message)
-        .join("; ");
-      throw new Error(`X API returned errors: ${msgs}`);
-    }
-    throw new Error(
-      `X API response missing .data -- unexpected structure. Keys: ${Object.keys(json).join(", ")}`,
-    );
-  }
-
-  const bookmarkTimeline = data?.bookmark_timeline_v2 as
-    | Record<string, unknown>
-    | undefined;
-  if (!bookmarkTimeline) {
-    throw new Error(
-      `X API response missing .data.bookmark_timeline_v2 -- keys: ${Object.keys(data).join(", ")}`,
-    );
-  }
-  const timeline = bookmarkTimeline?.timeline as Record<string, unknown>;
-  const instructions = (timeline?.instructions as unknown[]) ?? [];
-
-  // Extract entries from TimelineAddEntries instructions (match fieldtheory-cli loop)
-  const entries = Array.from(
-    instructions.filter(
-      (inst) =>
-        (inst as Record<string, unknown>).type === "TimelineAddEntries" &&
-        Array.isArray((inst as Record<string, unknown>).entries),
-    ),
-  )
-    .map(
-      (inst) => (inst as Record<string, unknown>).entries as Record<string, unknown>[],
-    )
-    .flat();
-
-  let nextCursor: string | undefined;
-
-  // Process entries functionally - filter and map operations
-  const processedEntries = entries
-    .map((entry) => {
-      const entryRecord = entry as Record<string, unknown>;
-
-      // Check for cursor
-      if (
-        typeof entryRecord.entryId === "string" &&
-        (entryRecord.entryId as string).startsWith("cursor-bottom")
-      ) {
-        nextCursor = (entryRecord.content as Record<string, unknown>)?.value as
-          | string
-          | undefined;
-        return null; // Skip cursor entries
-      }
-
-      // Extract tweet result
-      const content = entryRecord.content as
-        | Record<string, unknown>
-        | undefined;
-      const itemContent = content?.itemContent as
-        | Record<string, unknown>
-        | undefined;
-      const tweetResult = (itemContent?.tweet_results as Record<string, unknown>)?.result ??
-        (itemContent?.tweet_results as Record<string, unknown> | undefined);
-
-      if (!tweetResult) return null;
-
-      /* X API returns both old (nested) and new (flat) tweet formats.
-       * Wrap flat format so parseTweet works unchanged.
-       */
-      const tweetData = (tweetResult as Record<string, unknown>).tweet
-        ? tweetResult // old format: already has tweet wrapper
-        : { tweet: tweetResult }; // flat format: wrap it
-
-      const record = parseTweet(tweetData as Record<string, unknown>);
-      return record;
-    })
-    .filter((r): r is TweetData => r !== null);
-
-  return { records: processedEntries, nextCursor };
-};
-
 const fetchPage = async (
   config: GraphQLConfig,
   cursor: string | undefined,
-  attempt: number,
   count: number,
-): Promise<{ records: TweetData[]; nextCursor?: string }> => {
-  if (attempt >= 4) {
-    throw new Error("GraphQL Bookmarks API: all retry attempts failed");
-  }
-
+): Promise<{ records: TweetData[]; nextCursor: string | undefined }> => {
   const url = buildUrl(cursor, count);
   const headers = buildHeaders(config.csrfToken, config.cookieHeader);
 
-  const response = await fetch(url, { headers });
-
-  if (response.status === 429) {
-    const retryAfter = response.headers.get("retry-after");
-    const seconds = retryAfter ? Number(retryAfter) : Math.min(15 * Math.pow(2, attempt), 120);
-    await new Promise((r) => setTimeout(r, seconds * 1000));
-    return fetchPage(config, cursor, attempt + 1, count);
-  }
-
-  if (response.status >= 500) {
-    await new Promise((r) => setTimeout(r, 5000 * (attempt + 1)));
-    return fetchPage(config, cursor, attempt + 1, count);
-  }
+  const response = await fetchWithRetry(
+    { input: url, init: { headers } },
+    graphqlRetryPolicy(),
+  );
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new Error(`GraphQL API ${response.status}: ${text.slice(0, 300)}`);
   }
 
-  const json = (await response.json()) as Record<string, unknown>;
-  return parseResponse(json);
+  let json: unknown;
+  try {
+    json = await response.json();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`GraphQL API returned non-JSON body: ${msg}`);
+  }
+
+  const { records, nextCursor, stats } = parseResponse(json);
+  logger.info("[sync] page parse", {
+    entriesSeen: stats.entriesSeen,
+    tweetsParsed: stats.tweetsParsed,
+    entriesSkipped: stats.entriesSkipped,
+  });
+
+  return { records, nextCursor };
 };
 
 /** Recursive fetch all pages. Stops after 2 stale pages (0 new tweets). */
@@ -278,16 +164,15 @@ const fetchAllPages = async (
   limit: number,
   count: number,
   existingIds: Set<string>,
-  cursor?: string,
-  acc: TweetData[][] = [],
-  stalePages = 0,
+  cursor: string | undefined,
+  acc: TweetData[][],
+  stalePages: number,
 ): Promise<TweetData[][]> => {
   if (acc.flat().length >= limit) return acc;
-  if (stalePages >= 2) return acc; // Stop after 2 stale pages
+  if (stalePages >= 2) return acc;
 
-  const { records, nextCursor } = await fetchPage(config, cursor, 0, count);
+  const { records, nextCursor } = await fetchPage(config, cursor, count);
 
-  // Diagnostic: log what the API is actually returning
   const existingInPage = records.filter((r) => existingIds.has(r.id)).length;
   const newRecords = records.filter((r) => !existingIds.has(r.id));
   const pageIsStale = newRecords.length === 0;
@@ -311,18 +196,13 @@ const fetchAllPages = async (
   }
 
   const newAcc = [...acc, newRecords];
-  const newStalePages = pageIsStale ? stalePages + 1 : 0; // Reset on new tweets
+  const newStalePages = pageIsStale ? stalePages + 1 : 0;
 
-  if (pageIsStale) {
-    if (newStalePages >= 2) return newAcc;
-  }
-
+  if (pageIsStale && newStalePages >= 2) return newAcc;
   if (!nextCursor) return newAcc;
 
-  // Jitter between requests
   await jitter();
 
-  // Recursive call (no while loop, no lint error)
   return fetchAllPages(
     config,
     limit,
@@ -347,15 +227,12 @@ export interface GraphQLConfig {
 
 export const createGraphQL = (): UncheckedSource<GraphQLConfig> => ({
   check: async (config: GraphQLConfig): Promise<CheckedSource> => {
-    // Inline validateConfig (was one-line null check, no reason for function call overhead)
     if (!config.csrfToken) throw new Error("GraphQL: csrfToken required");
 
-    // Build URL + headers FIRST, then pass to validation (separate concerns)
     const url = buildUrl(undefined, 1);
     const headers = buildHeaders(config.csrfToken, config.cookieHeader);
     await validateConnectivity(url, headers);
 
-    // Capture config in closure, return CheckedSource
     return {
       fetchBatch: (
         limit: number,
@@ -373,27 +250,29 @@ const fetchBatchImpl = async (
   concurrency: number,
   existingIds: Set<string>,
 ): Promise<FetchedBatchSource> => {
-  // Fetch all pages (recursive, no while+await, with jitter + staleness detection)
-  const pages = await fetchAllPages(config, limit, 200, existingIds);
+  const pages = await fetchAllPages(
+    config,
+    limit,
+    200,
+    existingIds,
+    undefined,
+    [],
+    0,
+  );
   const allTweets = pages.flat();
 
   return {
     processBatch: () => Promise.resolve(allTweets),
 
     processAll: async () => {
-      // CORRECT pooledMap usage: pre-existing array + concurrent processing
       const batches = chunk(allTweets, 100);
-
-      // Process batches concurrently and flatten results functionally
       const batchResults = pooledMap(
         concurrency,
         batches,
-        (b: TweetData[]) => Promise.resolve(b), // identity fn (actual processing goes here)
+        (b: TweetData[]) => Promise.resolve(b),
       );
-
-      // Flatten array of arrays (pooledMap returns TweetData[][])
       const flatResults = await Array.fromAsync(batchResults);
-      const results: TweetData[] = flatResults.flat() as TweetData[];
+      const results: TweetData[] = flatResults.flat();
       return results;
     },
   };
@@ -403,7 +282,6 @@ const fetchOneImpl = (
   _config: GraphQLConfig,
   _id: string,
 ): Promise<FetchedOneSource> => {
-  // Single tweet fetch (endpoint TBD, for now throw at process time)
   return Promise.resolve({
     processOne: () => {
       throw new Error("fetchOne: single-tweet endpoint TBD");

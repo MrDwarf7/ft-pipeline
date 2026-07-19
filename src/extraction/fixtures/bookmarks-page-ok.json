@@ -1,0 +1,77 @@
+{
+  "data": {
+    "bookmark_timeline_v2": {
+      "timeline": {
+        "instructions": [
+          {
+            "type": "TimelineAddEntries",
+            "entries": [
+              {
+                "entryId": "tweet-2039805659525644595",
+                "sortIndex": "1825000000000000000",
+                "content": {
+                  "entryType": "TimelineTimelineItem",
+                  "itemContent": {
+                    "itemType": "TimelineTweet",
+                    "tweet_results": {
+                      "result": {
+                        "__typename": "Tweet",
+                        "rest_id": "2039805659525644595",
+                        "core": {
+                          "user_results": {
+                            "result": {
+                              "rest_id": "33836629",
+                              "core": {
+                                "name": "Andrej Karpathy",
+                                "screen_name": "karpathy"
+                              },
+                              "legacy": {}
+                            }
+                          }
+                        },
+                        "note_tweet": {
+                          "note_tweet_results": {
+                            "result": {
+                              "text": "LLM Knowledge Bases -- full note text body"
+                            }
+                          }
+                        },
+                        "legacy": {
+                          "id_str": "2039805659525644595",
+                          "full_text": "LLM Knowledge Bases truncated...",
+                          "created_at": "Thu Apr 02 20:42:21 +0000 2026",
+                          "favorite_count": 56029,
+                          "retweet_count": 6674,
+                          "reply_count": 2759,
+                          "quote_count": 1966,
+                          "bookmark_count": 101751,
+                          "entities": {
+                            "urls": [
+                              {
+                                "expanded_url": "https://example.com/kb",
+                                "url": "https://t.co/abc"
+                              }
+                            ]
+                          }
+                        },
+                        "views": {
+                          "count": "19897360"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "entryId": "cursor-bottom-xyz",
+                "content": {
+                  "value": "DAACCgACEgUT6sAAKgAA"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

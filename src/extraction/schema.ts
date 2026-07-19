@@ -1,4 +1,4 @@
-/** Zod schemas for GraphQL response validation. */
+/** Zod schemas for X Bookmarks GraphQL -- leaf tweet + timeline envelope. */
 import { z } from "zod";
 
 export const MediaSchema = z.object({
@@ -17,6 +17,7 @@ export const UrlEntitySchema = z.object({
   expanded_url: z.string(),
 });
 
+/** Leaf tweet payload after optional flat->nested wrap (`{ tweet: ... }`). */
 export const TweetDataSchema = z.object({
   tweet: z.object({
     legacy: z.object({
@@ -77,3 +78,79 @@ export const TweetDataSchema = z.object({
       .optional(),
   }),
 });
+
+export type ParsedTweetNode = z.infer<typeof TweetDataSchema>;
+
+export const GraphQLErrorSchema = z
+  .object({
+    message: z.string(),
+  })
+  .passthrough();
+
+/** Single timeline entry (tweet item, cursor, or other module). */
+export const TimelineEntrySchema = z
+  .object({
+    entryId: z.string().optional(),
+    content: z
+      .object({
+        itemContent: z
+          .object({
+            tweet_results: z
+              .object({
+                result: z.unknown().optional(),
+              })
+              .passthrough()
+              .optional(),
+          })
+          .passthrough()
+          .optional(),
+        value: z.string().optional(),
+      })
+      .passthrough()
+      .optional(),
+    sortIndex: z.string().optional(),
+  })
+  .passthrough();
+
+export type TimelineEntry = z.infer<typeof TimelineEntrySchema>;
+
+const TimelineAddEntriesInstructionSchema = z.object({
+  type: z.literal("TimelineAddEntries"),
+  entries: z.array(TimelineEntrySchema),
+});
+
+const OtherTimelineInstructionSchema = z
+  .object({
+    type: z.string(),
+  })
+  .passthrough();
+
+/** Prefer TimelineAddEntries match before the open instruction shape. */
+export const TimelineInstructionSchema = z.union([
+  TimelineAddEntriesInstructionSchema,
+  OtherTimelineInstructionSchema,
+]);
+
+export type TimelineInstruction = z.infer<typeof TimelineInstructionSchema>;
+
+/** `data.bookmark_timeline_v2.timeline` once `data` is known present. */
+export const BookmarkTimelineDataSchema = z.object({
+  bookmark_timeline_v2: z.object({
+    timeline: z.object({
+      instructions: z.array(TimelineInstructionSchema),
+    }),
+  }),
+});
+
+/**
+ * Top-level Bookmarks GraphQL JSON. `data` may be null/absent on auth errors;
+ * timeline shape is validated separately after presence checks.
+ */
+export const BookmarksResponseSchema = z
+  .object({
+    data: z.unknown().nullable().optional(),
+    errors: z.array(GraphQLErrorSchema).optional(),
+  })
+  .passthrough();
+
+export type BookmarksResponse = z.infer<typeof BookmarksResponseSchema>;
