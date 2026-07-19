@@ -4,10 +4,10 @@
 
 | Feature                                                      | Status | Write-up                                            | Date       |
 | ------------------------------------------------------------ | ------ | --------------------------------------------------- | ---------- |
-| **SYNC** -- native GraphQL, no ft-cli                        | Done   | --                                                  | 2026-06-05 |
+| **SYNC** -- native GraphQL                                   | Done   | --                                                  | 2026-06-05 |
 | **MERGE** -- Clippings -> DB enrichment                      | Done   | [docs/completed/merge.md](completed/merge.md)       | 2026-05-05 |
 | **CLASSIFY** -- LLM classification (type + domain)           | Done   | [docs/completed/classify.md](completed/classify.md) | 2026-05-05 |
-| **GENERATE** -- template-based, no ft-cli                    | Done   | --                                                  | 2026-06-05 |
+| **GENERATE** -- template-based markdown                      | Done   | --                                                  | 2026-06-05 |
 | **INDEXES** -- category/domain/entity pages                  | Done   | [docs/completed/indexes.md](completed/indexes.md)   | 2026-05-05 |
 | **Config refactor** -- XDG on Linux, env-paths elsewhere     | Done   | --                                                  | 2026-06-12 |
 | **Direct wiki output** -- pipeline writes to StoneVault/wiki | Done   | --                                                  | 2026-06-12 |

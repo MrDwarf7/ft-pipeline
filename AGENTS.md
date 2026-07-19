@@ -83,7 +83,7 @@ is and does -- not a novel.
 ## What This Is
 
 A Deno/TypeScript CLI for processing X/Twitter bookmarks. Full pipeline: Sync -> Extract -> Merge ->
-Classify -> Generate -> Indexes. Own GraphQL sync, own `pipeline.db`, no ft-cli dependency.
+Classify -> Generate -> Indexes. Own GraphQL sync and own `pipeline.db`.
 
 Goal: classify bookmarks by type/domain using a local LLM, generate Obsidian wiki pages.
 
@@ -152,7 +152,7 @@ ft-pipeline/
 |       |-- pipeline.ts    <- Pipeline composition and full run orchestration
 ```
 
-Removed dead modules: `src/options.ts`, `src/utils/ft-cli.ts` (gone; do not reintroduce).
+Removed dead modules: old option tombstones and legacy shell helpers (do not reintroduce).
 
 ## Tech Stack
 
@@ -229,7 +229,7 @@ indexes, injectable config unit test). See `TODO.md`.
    - Decrypts X session cookies (AES-GCM)
    - Fetches bookmarks via X GraphQL API (`fetchWithRetry` + envelope Zod)
    - Imports in transactions per chunk; on failure bisects so good rows still land
-   - Writes to our own `pipeline.db` (no ft-cli dependency)
+   - Writes to our own `pipeline.db`
 
 2. **EXTRACT:** xtracticle.com API -> StoneVault/Clippings/
    - Fetches each tweet via xtracticle (Zod + retry)
