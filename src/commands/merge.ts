@@ -116,8 +116,6 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
       ).map((r) => r.tweet_id),
     );
 
-    let merged = 0;
-    const skipped = 0;
     const now = new Date().toISOString();
 
     const stmt = db.prepare(`
@@ -129,17 +127,15 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
         AND (clippings_text IS NULL OR clippings_merged_at IS NULL)
     `);
 
-    const validClippings = Array.from(clippings.entries()).filter(([tweetId]) =>
-      dbIds.has(tweetId)
-    );
+    const allEntries = Array.from(clippings.entries());
+    const validClippings = allEntries.filter(([tweetId]) => dbIds.has(tweetId));
+    const skipped = allEntries.length - validClippings.length;
 
-    const updatePromises = validClippings.map(([tweetId, entry]) => {
+    /* Sequential writes; count is pure length of attempted valid rows (no free-form ++). */
+    validClippings.forEach(([tweetId, entry]) => {
       stmt.run(entry.body, entry.type, now, tweetId);
-      merged++;
-      return Promise.resolve();
     });
-
-    await Promise.all(updatePromises);
+    const merged = validClippings.length;
 
     logger.info("merge complete", { merged, skipped, total: clippings.size });
 

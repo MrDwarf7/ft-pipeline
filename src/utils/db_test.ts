@@ -130,12 +130,12 @@ Deno.test("prepare run/all bind special strings and null", () => {
 
     const nullWord = db.prepare(
       "SELECT text, primary_type FROM bookmarks WHERE tweet_id = ?",
-    ).all<{ text: string; primary_type: string | null }>("444");
+    ).all("444");
     assertEquals(nullWord, [{ text: "null", primary_type: null }]);
 
     const multi = db.prepare(
       "SELECT text FROM bookmarks WHERE tweet_id = ?",
-    ).all<{ text: string }>("445");
+    ).all("445");
     assertEquals(multi[0]?.text, "it's fine\nline2");
   });
 });

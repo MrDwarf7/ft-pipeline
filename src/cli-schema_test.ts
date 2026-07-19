@@ -12,6 +12,7 @@ Deno.test("config subcommand help lists subs", () => {
   const help = findHelpScreen(["config", "--help"]) ?? "";
   assertEquals(help.includes("show"), true);
   assertEquals(help.includes("set"), true);
+  assertEquals(help.includes("migrate"), true);
 });
 
 Deno.test("parse config: valueName => string, else boolean", () => {

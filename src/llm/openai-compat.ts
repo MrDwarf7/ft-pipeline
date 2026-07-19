@@ -16,7 +16,7 @@ const sleep = (ms: number): Promise<void> =>
 
 /** Retry policy from CONFIG -- every RetryPolicy field set explicitly here. */
 const buildLlmRetryPolicy = (): RetryPolicy => ({
-  maxAttempts: Math.max(1, CONFIG.maxRetries),
+  maxAttempts: CONFIG.maxExternalCallAttempts,
   baseDelayMs: CONFIG.retryBaseMs,
   jitter: true,
   retryOn: [500, 502, 503],

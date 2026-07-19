@@ -14,6 +14,11 @@ import { z } from "zod";
 import { BASES } from "./utils/bases.ts";
 import { envOrFallback } from "./utils/env.ts";
 
+/** stdout helper -- config cannot import logger (logger imports CONFIG). */
+const writeOut = (line: string): void => {
+  Deno.stdout.writeSync(new TextEncoder().encode(`${line}\n`));
+};
+
 const CONFIG_FILE = `${BASES.appConfigDir}/config.jsonc`;
 
 /** Pure config schema -- no paths, no code. This is the serialization contract. */
@@ -32,7 +37,8 @@ const configSchema = z.object({
   extractDelayMs: z.number().int().nonnegative(),
   extractJitterMs: z.number().int().nonnegative(),
   minPostTextLength: z.number().int().positive(),
-  maxRetries: z.number().int().nonnegative(),
+  /** Total HTTP attempts for X / xtracticle / LLM (not "retries after first"). */
+  maxExternalCallAttempts: z.number().int().min(1),
   retryBaseMs: z.number().int().nonnegative(),
   classificationBatchSize: z.number().int().positive(),
   clippingDirs: z.object({
@@ -43,6 +49,148 @@ const configSchema = z.object({
 });
 
 export type Config = z.infer<typeof configSchema>;
+
+/** One legacy key rename still accepted at load time until the file is rewritten. */
+export interface ConfigKeyRename {
+  readonly from: string;
+  readonly to: string;
+  /** Map the old value into the new key's domain. */
+  readonly mapValue: (value: unknown) => unknown;
+}
+
+/**
+ * Ordered renames for on-disk config.jsonc.
+ * Load path still accepts legacy keys; migrate rewrites the file.
+ */
+export const CONFIG_KEY_RENAMES: readonly ConfigKeyRename[] = [
+  {
+    from: "maxRetries",
+    to: "maxExternalCallAttempts",
+    mapValue: (value: unknown): unknown =>
+      typeof value === "number" && Number.isFinite(value) ? Math.max(1, value) : value,
+  },
+];
+
+/** A pending file rewrite: old key still present on disk. */
+export interface PendingConfigMigration {
+  readonly from: string;
+  readonly to: string;
+  readonly oldValue: unknown;
+  readonly newValue: unknown;
+}
+
+/** Apply rename rules to a plain object; pure (does not touch disk). */
+export const applyConfigKeyRenames = (
+  raw: Record<string, unknown>,
+  renames: readonly ConfigKeyRename[],
+): {
+  readonly next: Record<string, unknown>;
+  readonly applied: readonly PendingConfigMigration[];
+} => {
+  const next: Record<string, unknown> = { ...raw };
+  const applied = renames.flatMap((rule): PendingConfigMigration[] => {
+    if (!(rule.from in next)) return [];
+    const oldValue = next[rule.from];
+    const mapped = rule.mapValue(oldValue);
+    const newValue = rule.to in next ? next[rule.to] : mapped;
+    if (!(rule.to in next)) {
+      next[rule.to] = mapped;
+    }
+    delete next[rule.from];
+    return [{ from: rule.from, to: rule.to, oldValue, newValue }];
+  });
+  return { next, applied };
+};
+
+/** Map a parsed config object; rewrite legacy keys into Partial<Config> fields. */
+const normalizeFilePartial = (raw: unknown): Partial<Config> => {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const { next } = applyConfigKeyRenames(
+    { ...(raw as Record<string, unknown>) },
+    CONFIG_KEY_RENAMES,
+  );
+  return next as Partial<Config>;
+};
+
+/** Read config.jsonc root object, or null if the file is missing. */
+const readConfigFileObject = (): Record<string, unknown> | null => {
+  let text: string;
+  try {
+    text = Deno.readTextFileSync(CONFIG_FILE);
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return null;
+    throw err;
+  }
+  const parsed = parseJsonc(text);
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`Invalid config file ${CONFIG_FILE}: root must be an object`);
+  }
+  return { ...(parsed as Record<string, unknown>) };
+};
+
+/** Legacy keys still present on disk (silent load mapping is not enough to clean the file). */
+export const listPendingConfigMigrations = (): readonly PendingConfigMigration[] => {
+  const obj = readConfigFileObject();
+  if (obj === null) return [];
+  return applyConfigKeyRenames(obj, CONFIG_KEY_RENAMES).applied;
+};
+
+/**
+ * Rewrite config.jsonc applying all pending key renames.
+ * Returns applied renames (empty if nothing to do or no file).
+ */
+export const migrateConfigFile = (): {
+  readonly applied: readonly PendingConfigMigration[];
+  readonly path: string;
+} => {
+  const obj = readConfigFileObject();
+  if (obj === null) {
+    throw new Error(
+      `No config file at ${CONFIG_FILE}; run: ft-pipeline config init`,
+    );
+  }
+  const { next, applied } = applyConfigKeyRenames(obj, CONFIG_KEY_RENAMES);
+  if (applied.length === 0) {
+    return { applied: [], path: CONFIG_FILE };
+  }
+  const cfg = configSchema.parse(mergeFile(normalizeFilePartial(next)));
+  writeConfigFile(cfg);
+  return { applied, path: CONFIG_FILE };
+};
+
+/**
+ * If stdin/stdout are TTYs and the on-disk file still has legacy keys, ask once
+ * whether to rewrite the file. Non-interactive runs skip (legacy keys still load).
+ */
+export const promptConfigMigrationIfNeeded = (): void => {
+  if (Deno.env.get("FT_NO_CONFIG_MIGRATE_PROMPT") === "1") return;
+  if (!Deno.stdin.isTerminal() || !Deno.stdout.isTerminal()) return;
+
+  const pending = listPendingConfigMigrations();
+  if (pending.length === 0) return;
+
+  pending.forEach((p) => {
+    writeOut(`${p.to} changed from ${p.from} -> ${p.to}`);
+  });
+
+  const answer = prompt("would you like to migrate it now? [Y/n]");
+  if (answer === null) return;
+  const trimmed = answer.trim().toLowerCase();
+  const yes = trimmed === "" || trimmed === "y" || trimmed === "yes";
+  if (!yes) {
+    writeOut(
+      "config migrate skipped (legacy keys still accepted until rewritten)",
+    );
+    return;
+  }
+
+  const { applied, path } = migrateConfigFile();
+  writeOut(
+    `migrated ${applied.length} key(s) in ${path}: ${
+      applied.map((a) => `${a.from} -> ${a.to}`).join(", ")
+    }`,
+  );
+};
 
 /** Computed defaults -- the seed for the config file and the floor for resolution. */
 const DEFAULTS: Config = {
@@ -60,7 +208,7 @@ const DEFAULTS: Config = {
   extractDelayMs: 750,
   extractJitterMs: 400,
   minPostTextLength: 200,
-  maxRetries: 3,
+  maxExternalCallAttempts: 4,
   retryBaseMs: 2000,
   classificationBatchSize: 50,
   clippingDirs: {
@@ -109,7 +257,7 @@ const loadConfig = (): Config => {
     throw new Error(`Invalid config file ${CONFIG_FILE}: ${msg}`);
   }
 
-  const merged = mergeFile((parsed as Partial<Config>) ?? {});
+  const merged = mergeFile(normalizeFilePartial(parsed));
   const result = configSchema.safeParse(merged);
   if (!result.success) {
     const issues = result.error.issues
@@ -142,7 +290,7 @@ export const writeConfigFile = (cfg: Config): void => {
 /** Read and validate config.jsonc from disk. */
 export const readConfigFile = (): Config => {
   const raw = Deno.readTextFileSync(CONFIG_FILE);
-  return configSchema.parse(mergeFile(parseJsonc(raw) as Partial<Config>));
+  return configSchema.parse(mergeFile(normalizeFilePartial(parseJsonc(raw))));
 };
 
 /** Load config from disk, or return built-in defaults only when the file is missing.

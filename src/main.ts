@@ -14,7 +14,7 @@ import { pipeline, runFull } from "./utils/pipeline.ts";
 import { checkCookies, runCookieExtract } from "./commands/cookies.ts";
 import { runConfig } from "./commands/config.ts";
 import { logger } from "./utils/logger.ts";
-import { CONFIG } from "./config.ts";
+import { CONFIG, promptConfigMigrationIfNeeded } from "./config.ts";
 
 // Commands that need cookies + password -- check env up front
 const REQUIRES_COOKIES: Set<Command> = new Set([Command.Sync, Command.Full]);
@@ -61,6 +61,15 @@ const main = async () => {
   const command = commandArg as Command;
   const subcommand = args._[1] ? String(args._[1]) : undefined;
   const rest = args._.slice(2).map(String);
+
+  /* Interactive rewrite of legacy config keys (maxRetries -> ...). Skip for
+   * explicit migrate so the command owns the flow; non-TTY never blocks. */
+  if (
+    !(command === Command.Config &&
+      (subcommand === "migrate" || Deno.args.includes("--migrate")))
+  ) {
+    promptConfigMigrationIfNeeded();
+  }
 
   cleanupLogs();
 

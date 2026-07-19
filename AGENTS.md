@@ -82,11 +82,10 @@ is and does -- not a novel.
 
 ## What This Is
 
-A Deno/TypeScript CLI for processing X/Twitter bookmarks from the `ft` CLI. Full pipeline: Sync ->
-Extract -> Merge -> Classify -> Generate -> Indexes.
+A Deno/TypeScript CLI for processing X/Twitter bookmarks. Full pipeline: Sync -> Extract -> Merge ->
+Classify -> Generate -> Indexes. Own GraphQL sync, own `pipeline.db`, no ft-cli dependency.
 
-2204 bookmarks in a local SQLite DB. Goal: classify them by type/domain using a local LLM, generate
-Obsidian wiki pages.
+Goal: classify bookmarks by type/domain using a local LLM, generate Obsidian wiki pages.
 
 ## Project Structure
 
@@ -98,54 +97,70 @@ ft-pipeline/
 |-- deno.json              <- Tasks: sync, extract, classify, generate, indexes, full
 |-- docs/
 |   |-- index.md           <- Docs home
-|   |-- completed/         <- Write-ups for completed steps (merge, classify, indexes, sync-refactor)
-|   |-- features/          <- In-housing plan: F0-F4 feature docs (GraphQL port, generate, extraction, folders, media)
-|   |-- _fixes/            <- Fix specs (B1-B6, most done)
+|   |-- completed/         <- Write-ups for completed steps
+|   |-- features/          <- Feature docs (GraphQL port, generate, extraction, folders, media)
+|   |-- feature-parity/    <- Media download, folders, etc.
+|   |-- worktrees-immediate.md <- Immediate waves 0-2 (landed); agent spawn notes
+|   |-- _fixes/            <- Historical fix specs (B1-B6)
 |-- scripts/
 |   |-- run-with-llm.sh    <- LLM server lifecycle management
 |-- src/
 |   |-- main.ts            <- Entry point, CLI arg parsing, command dispatch
 |   |-- cli-schema.tree.ts <- CLI command tree (commands and options)
 |   |-- cli-schema.types.ts <- CLI schema types (OptionSpec, LeafCommand, etc.)
+|   |-- consts.ts          <- Shared CLI/runtime constants
 |   |-- types.ts           <- Command enum, Args interface, parse helpers
-|   |-- config.ts          <- All paths, thresholds, taxonomy constants
+|   |-- config.ts          <- Paths, thresholds, taxonomy; maxExternalCallAttempts
 |   |-- commands/
-|   |   |-- sync.ts        <- Native GraphQL sync from X -> pipeline.db
-|   |   |-- extract.ts     <- xtracticle.com API -> Clippings/*.md + DB update
+|   |   |-- sync.ts        <- GraphQL sync from X -> pipeline.db (chunk import + bisect)
+|   |   |-- extract.ts     <- Extract entry; delegates to extract/*
+|   |   |-- extract/       <- classifyTweet, clipping write, process batch, db
 |   |   |-- merge.ts       <- Clippings enriched text -> DB (clippings_text)
-|   |   |-- classify.ts    <- Orchestrator for LLM classification
+|   |   |-- classify.ts    <- Orchestrator; settleClassify per-item failure path
 |   |   |-- classify-db.ts <- DB operations for classification
 |   |   |-- classify-llm.ts <- LLM prompt, call, and response parsing
-|   |   |-- generate.ts    <- Template-based .md file generation from pipeline.db
-|   |   |-- indexes.ts     <- Category/domain/entity index page generation
+|   |   |-- generate.ts    <- Template-based .md generation from pipeline.db
+|   |   |-- indexes.ts     <- Index command entry (runIndexes)
+|   |   |-- indexes/       <- query / view / render / write + hash cache
+|   |   |-- config.ts      <- Config show/set CLI
 |   |   |-- cookies.ts     <- Cookie encryption/decryption for X auth
 |   |   |-- help.ts        <- Help text and usage output
-|   |   |-- migrate.ts     <- Create/migrate our own pipeline DB schema
+|   |   |-- migrate.ts     <- Create/migrate pipeline DB schema
 |   |-- extraction/
-|   |   |-- index.ts       <- Extraction source interface + factory (type-state pattern)
-|   |   |-- graphql.ts     <- GraphQL client for X bookmarks API
-|   |   |-- schema.ts      <- Zod schemas for GraphQL response validation
+|   |   |-- index.ts       <- Extraction source interface + factory (type-state)
+|   |   |-- graphql.ts     <- X bookmarks GraphQL client (fetchWithRetry)
+|   |   |-- parse.ts       <- Timeline envelope parse + drop counts
+|   |   |-- schema.ts      <- Zod schemas for GraphQL responses
+|   |   |-- xtracticle.ts  <- xtracticle HTTP client (fetchWithRetry)
+|   |   |-- xtracticle-schema.ts <- Zod for xtracticle responses
 |   |   |-- types.ts       <- Shared types for extraction sources
 |   |-- llm/
-|   |   |-- index.ts       <- LLM provider interface + factory
-|   |   |-- openai-compat.ts <- OpenAI-compatible API client (llama-server)
+|   |   |-- index.ts       <- LLM provider interface + factory (check -> ConnectedLLM)
+|   |   |-- openai-compat.ts <- OpenAI-compatible client; check() probes inference
+|   |   |-- schema.ts      <- Zod for LLM API responses
 |   |-- utils/
 |       |-- bases.ts       <- App environment + base path resolution (XDG)
-|       |-- db.ts          <- Pipeline DB singleton via sqlite3 CLI subprocess
+|       |-- db.ts          <- sqlite3 CLI: insert/upsert/update/select/transaction
+|       |-- db-rows.ts     <- parseRows + zod row schemas (no .all<T>())
+|       |-- http.ts        <- Shared fetchWithRetry (429, backoff, max attempts)
 |       |-- env.ts         <- Required env var checker + .env loader
 |       |-- crypto.ts      <- AES-GCM cookie encryption
+|       |-- datetime.ts    <- Date parse helpers
 |       |-- frontmatter.ts <- Shared frontmatter parser
 |       |-- hash.ts        <- SHA-256 hashing for content comparison
 |       |-- logger.ts      <- Structured JSON logger
 |       |-- pipeline.ts    <- Pipeline composition and full run orchestration
 ```
 
+Removed dead modules: `src/options.ts`, `src/utils/ft-cli.ts` (gone; do not reintroduce).
+
 ## Tech Stack
 
 - **Runtime:** Deno (no node_modules)
 - **Language:** TypeScript
-- **DB:** SQLite via `sqlite3` CLI subprocess
+- **DB:** SQLite via `sqlite3` CLI subprocess (`insert`/`upsert`/`update`/`select`/`transaction`)
 - **LLM:** Local model via llama-server at `localhost:1234` (OpenAI-compatible)
+- **HTTP:** Shared `fetchWithRetry` driven by `CONFIG.maxExternalCallAttempts` + `retryBaseMs`
 
 ## Conventions
 
@@ -181,56 +196,65 @@ deno task full           # Run entire pipeline end-to-end
 
 ## Pipeline Status
 
-What the code actually does vs. what was agreed. See `TODO.md` for the full audit and `docs/_fixes/`
-for fix specs.
+Verified against `src/` post-refactor (immediate waves 0-2). See `TODO.md` for feature backlog.
 
 ```
 Pipeline: SYNC -> EXTRACT -> MERGE -> CLASSIFY -> GENERATE -> INDEXES
 ```
 
-| Step     | Status | What's wrong                                                   | Fix doc       |
-| -------- | ------ | -------------------------------------------------------------- | ------------- |
-| Sync     | OK     | Native GraphQL client, no ft-cli dependency                    | --            |
-| Extract  | OK     | Patched (query + classifyTweet). Article images still missing. | B4            |
-| Merge    | OK     | Fully implemented -- reads Clippings, enriches DB              | B1 (done)     |
-| Classify | OK     | System prompt, JSON schema, enrichment fallback                | B2, B3 (done) |
-| Generate | OK     | Template closures, pure functions, no ft-cli                   | --            |
-| Indexes  | OK     | Category/domain/entity pages with hash-based caching           | B5 (done)     |
+| Step     | Status | Notes                                                                                         |
+| -------- | ------ | --------------------------------------------------------------------------------------------- |
+| Sync     | OK     | GraphQL + `fetchWithRetry` + envelope Zod; chunk import; fail bisects ("as many as possible") |
+| Extract  | OK     | xtracticle Zod + retry; module split under `commands/extract/`; remote article images         |
+| Merge    | OK     | Clippings -> `clippings_text`; singular/plural type rank                                      |
+| Classify | OK     | `settleClassify` per-item; LLM `check()` probe is intentional type-state gate                 |
+| Generate | OK     | Template render from `pipeline.db`                                                            |
+| Indexes  | OK     | Split query/view/render/write; hash cache; primary_* only (multi-label backlog)               |
 
-**Open items:** See `TODO.md` for feature parity backlog (media download, bookmark folders, LLM
-fallback, tests).
+**Config:** `maxExternalCallAttempts` (default 4) = total HTTP attempts for X / xtracticle / LLM.
+Legacy `maxRetries` in `config.jsonc` is still accepted and mapped. Shared `retryBaseMs`.
+
+**DB:** sqlite3 CLI with `insert`/`upsert`/`update`/`select`/`transaction`. `Statement.all` returns
+`Record[]` only -- callers use `parseRows` + zod (`src/utils/db-rows.ts`). No `.all<T>()`.
+
+**runFull:** continues past non-critical step failures (logs + continues); only hard throws fail the
+process for that step -- remaining steps still run.
+
+**Open items:** feature parity backlog (media download, folders, LLM fallback chain, multi-label
+indexes, injectable config unit test). See `TODO.md`.
 
 ## Pipeline Flow
 
 1. **SYNC:** Native GraphQL client -> pipeline.db
    - Decrypts X session cookies (AES-GCM)
-   - Fetches bookmarks via X GraphQL API directly
+   - Fetches bookmarks via X GraphQL API (`fetchWithRetry` + envelope Zod)
+   - Imports in transactions per chunk; on failure bisects so good rows still land
    - Writes to our own `pipeline.db` (no ft-cli dependency)
 
 2. **EXTRACT:** xtracticle.com API -> StoneVault/Clippings/
-   - Fetches each tweet via xtracticle.com/api/thread/{tweet_id}
+   - Fetches each tweet via xtracticle (Zod + retry)
    - Classifies into X-Articles / X-Posts / X-Media
    - Writes .md files with frontmatter to Clippings/
    - Updates DB: clipping_path, content_type, extract_status
 
 3. **MERGE:** Clippings -> DB (clippings_text column)
    - Reads all .md files from Clippings/
-   - Matches by tweet_id, priority: articles > posts > media
+   - Matches by tweet_id; type rank handles singular/plural labels
+   - Priority: articles > posts > media
    - Stores enriched text in clippings_text (cap 5000 chars)
 
 4. **CLASSIFY:** DB -> Local LLM -> DB
+   - LLM factory `check()` includes an inference probe -- if check fails, classify must not run
+   - Per-item failures go through `settleClassify` (log + `"failed"`, batch continues)
    - Uses clippings_text when available (falls back to text)
-   - Sends to local model via llama-server
    - Writes: primary_type, primary_domain, types, domains, confidence
-   - Uses our own pipeline.db
 
 5. **GENERATE:** DB -> md pages in ~/StoneVault/wiki/bookmarks/
    - Template closures render bookmark stubs directly from pipeline.db
-   - No ft-cli dependency
 
 6. **INDEXES:** DB -> index pages with cross-links and entity summaries
-   - Category, domain, entity pages
-   - Master index
+   - Modules: query -> view -> render -> write
+   - Category, domain, entity pages + master index
    - SHA-256 hash comparison before writing (saves I/O)
 
 ## Architecture
@@ -245,7 +269,8 @@ control, migrations on demand. We no longer depend on ft's database.
 - **Clippings:** `~/StoneVault/Clippings/`
 - **Wiki output:** `~/StoneVault/wiki/` (bookmarks/, categories/, domains/, entities/, index.md)
 - **LLM:** `http://localhost:1234/v1/chat/completions` (llama-server)
-- **Config:** `src/config.ts` -- all paths, thresholds, taxonomy
+- **Config:** `src/config.ts` -- paths, thresholds, taxonomy, `maxExternalCallAttempts` /
+  `retryBaseMs`
 - **Scripts:** `scripts/run-with-llm.sh`
 
 ## Required Environment Variables

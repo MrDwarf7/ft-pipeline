@@ -327,6 +327,12 @@ const configCommand = {
       description: "Set a configuration key to a value",
       subcommands: null,
     },
+    migrate: {
+      name: "migrate",
+      description:
+        "Rewrite legacy config keys on disk (e.g. maxRetries -> maxExternalCallAttempts)",
+      subcommands: null,
+    },
   },
 } as const satisfies BranchCommand;
 

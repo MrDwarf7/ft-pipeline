@@ -1,10 +1,10 @@
 # Immediate worktrees -- agent spawn guide
 
-Source of truth for **what**: `TODO.md` (I0--I9).  
+Source of truth for **what**: `TODO.md` (I0--I9).\
 Source of truth for **who owns which files / which wave**: this doc.
 
-Orchestrator: create one jj workspace per area, point agent at that cwd, require commit of
-**only** listed filesets, reintegrate with merge commits (`jj new rev1 rev2 ...`).
+Orchestrator: create one jj workspace per area, point agent at that cwd, require commit of **only**
+listed filesets, reintegrate with merge commits (`jj new rev1 rev2 ...`).
 
 ```bash
 # example -- from main repo after baseline is committed
@@ -20,16 +20,17 @@ After each area finishes: `deno task ch:all` + relevant tests in that worktree.
 
 ### WT-hygiene
 
-| | |
-| -- | -- |
-| **Maps** | I1 |
-| **Own** | Delete `src/options.ts`, `src/utils/ft-cli.ts`. Edit `AGENTS.md` project tree only. |
+|           |                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------- |
+| **Maps**  | I1                                                                                          |
+| **Own**   | Delete `src/options.ts`, `src/utils/ft-cli.ts`. Edit `AGENTS.md` project tree only.         |
 | **Avoid** | Runtime TS under `src/commands`, `src/extraction`, `src/llm`, `src/utils` (except deletes). |
 
 **Acceptance**
 
 - [ ] Both dead files gone; no remaining imports (there should be none).
-- [ ] AGENTS tree: no `ft-cli.ts`; CLI schema listed as `cli-schema.tree.ts` + `cli-schema.types.ts`.
+- [ ] AGENTS tree: no `ft-cli.ts`; CLI schema listed as `cli-schema.tree.ts` +
+      `cli-schema.types.ts`.
 - [ ] `deno task ch:all` green.
 
 **Agent prompt sketch**
@@ -41,10 +42,10 @@ After each area finishes: `deno task ch:all` + relevant tests in that worktree.
 
 ### WT-classify
 
-| | |
-| -- | -- |
-| **Maps** | I0, I8 (classify failure) |
-| **Own** | `src/commands/classify.ts`, optional new/updated `src/commands/classify*_test.ts` |
+|           |                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------- |
+| **Maps**  | I0, I8 (classify failure)                                                                   |
+| **Own**   | `src/commands/classify.ts`, optional new/updated `src/commands/classify*_test.ts`           |
 | **Avoid** | `classify-llm.ts`, `llm/`, `pipeline.ts`, `classify-db.ts` unless test forces a tiny export |
 
 **Problem**
@@ -66,10 +67,10 @@ aborts the batch.
 
 ### WT-db
 
-| | |
-| -- | -- |
-| **Maps** | I2 (core), I8 (db helper) |
-| **Own** | `src/utils/db.ts`, add `src/utils/db_test.ts` |
+|           |                                                                      |
+| --------- | -------------------------------------------------------------------- |
+| **Maps**  | I2 (core), I8 (db helper)                                            |
+| **Own**   | `src/utils/db.ts`, add `src/utils/db_test.ts`                        |
 | **Avoid** | Rewriting every command call site (that is Wave 2 **WT-db-callers**) |
 
 #### Target API (implement this)
@@ -121,8 +122,10 @@ closePipelineDb(): void;
 
 **Runner rules**
 
-- Bind with sqlite3 `.parameter init` / `.parameter set ?N value` (not string interpolate for values).
-- `.mode json` for SELECT; empty stdout → `[]`; bad JSON or nonzero exit → **throw** (never fake empty).
+- Bind with sqlite3 `.parameter init` / `.parameter set ?N value` (not string interpolate for
+  values).
+- `.mode json` for SELECT; empty stdout → `[]`; bad JSON or nonzero exit → **throw** (never fake
+  empty).
 - Table/column names in helpers are our string literals only; values always bound.
 - `params` is always an array (no spread-or-array dual API).
 - No default parameters in TypeScript functions.
@@ -144,8 +147,8 @@ closePipelineDb(): void;
 
 ## Shared conventions (all worktrees)
 
-- **jj:** commit only your owned filesets; do **not** merge to main; leave real work commit id in the
-  final message.
+- **jj:** commit only your owned filesets; do **not** merge to main; leave real work commit id in
+  the final message.
 - **Checks:** `deno task ch:all` before handoff; run new/related tests.
 - **Style:** AGENTS.md -- no default params, no lint ignore, no bare `as` without zod/validation,
   ASCII in `.ts` comments, doc form for `/** */`.
@@ -155,10 +158,10 @@ closePipelineDb(): void;
 
 ### WT-migrate
 
-| | |
-| -- | -- |
-| **Maps** | I6 |
-| **Own** | `src/commands/migrate.ts` |
+|           |                                       |
+| --------- | ------------------------------------- |
+| **Maps**  | I6                                    |
+| **Own**   | `src/commands/migrate.ts`             |
 | **Avoid** | `src/utils/db.ts` (consume API as-is) |
 
 **Acceptance**
@@ -174,17 +177,17 @@ closePipelineDb(): void;
 
 ### WT-http
 
-| | |
-| -- | -- |
-| **Maps** | I4 (library only) |
-| **Own** | **New** `src/utils/http.ts`, `src/utils/http_test.ts` |
+|           |                                                       |
+| --------- | ----------------------------------------------------- |
+| **Maps**  | I4 (library only)                                     |
+| **Own**   | **New** `src/utils/http.ts`, `src/utils/http_test.ts` |
 | **Avoid** | Wiring into graphql/extract/llm (Wave 1 owns wire-up) |
 
 **Acceptance**
 
-- [ ] Export something like `fetchWithRetry(request, policy)` where `policy` includes
-      `maxAttempts`, `baseDelayMs`, jitter flag, optional `retryOn` -- **all required by caller**
-      (no default params in TS).
+- [ ] Export something like `fetchWithRetry(request, policy)` where `policy` includes `maxAttempts`,
+      `baseDelayMs`, jitter flag, optional `retryOn` -- **all required by caller** (no default
+      params in TS).
 - [ ] On 429: honor `Retry-After` when present; else exponential backoff from policy.
 - [ ] Exhaustion → Error with status + attempt count (clear message).
 - [ ] Unit tests with mock fetch / injected fetch fn.
@@ -197,12 +200,12 @@ helper. Do not edit graphql in this worktree.
 
 ### WT-indexes
 
-| | |
-| -- | -- |
-| **Maps** | I7 (indexes only) |
-| **Own** | `src/commands/indexes.ts` and any new modules it is split into (e.g.
-  `src/commands/indexes/*.ts` or `src/indexes/*`) |
-| **Avoid** | extract, graphql, generate |
+|                                                 |                                                                      |
+| ----------------------------------------------- | -------------------------------------------------------------------- |
+| **Maps**                                        | I7 (indexes only)                                                    |
+| **Own**                                         | `src/commands/indexes.ts` and any new modules it is split into (e.g. |
+| `src/commands/indexes/*.ts` or `src/indexes/*`) |                                                                      |
+| **Avoid**                                       | extract, graphql, generate                                           |
 
 **Acceptance**
 
@@ -215,10 +218,10 @@ helper. Do not edit graphql in this worktree.
 
 ### WT-tests-pure
 
-| | |
-| -- | -- |
-| **Maps** | I8 (pure units) |
-| **Own** | New test files only (prefer `*_test.ts` next to units) |
+|           |                                                                          |
+| --------- | ------------------------------------------------------------------------ |
+| **Maps**  | I8 (pure units)                                                          |
+| **Own**   | New test files only (prefer `*_test.ts` next to units)                   |
 | **Avoid** | Changing production code except trivial pure-bug fixes agreed mid-flight |
 
 **Suggested tests**
@@ -236,11 +239,11 @@ helper. Do not edit graphql in this worktree.
 
 ### WT-sync
 
-| | |
-| -- | -- |
-| **Maps** | I4 wire GraphQL, I5 GraphQL Zod, I7 graphql split |
-| **Own** | `src/extraction/**` |
-| **Depends** | WT-http merged |
+|             |                                                   |
+| ----------- | ------------------------------------------------- |
+| **Maps**    | I4 wire GraphQL, I5 GraphQL Zod, I7 graphql split |
+| **Own**     | `src/extraction/**`                               |
+| **Depends** | WT-http merged                                    |
 
 **Acceptance**
 
@@ -256,11 +259,11 @@ helper. Do not edit graphql in this worktree.
 
 ### WT-extract
 
-| | |
-| -- | -- |
-| **Maps** | I4 wire xtracticle, I5 xtracticle Zod, I7 extract split, extract-local I3 |
-| **Own** | `src/commands/extract.ts` + new extract/xtracticle modules you create |
-| **Depends** | WT-http merged |
+|             |                                                                           |
+| ----------- | ------------------------------------------------------------------------- |
+| **Maps**    | I4 wire xtracticle, I5 xtracticle Zod, I7 extract split, extract-local I3 |
+| **Own**     | `src/commands/extract.ts` + new extract/xtracticle modules you create     |
+| **Depends** | WT-http merged                                                            |
 
 **Acceptance**
 
@@ -276,11 +279,11 @@ helper. Do not edit graphql in this worktree.
 
 ### WT-llm
 
-| | |
-| -- | -- |
-| **Maps** | I4 wire LLM, I5 LLM response Zod, I9 hygiene |
-| **Own** | `src/llm/**`; only if needed `src/commands/classify-llm.ts` for explicit options |
-| **Depends** | WT-http merged |
+|             |                                                                                  |
+| ----------- | -------------------------------------------------------------------------------- |
+| **Maps**    | I4 wire LLM, I5 LLM response Zod, I9 hygiene                                     |
+| **Own**     | `src/llm/**`; only if needed `src/commands/classify-llm.ts` for explicit options |
+| **Depends** | WT-http merged                                                                   |
 
 **Acceptance**
 
@@ -296,13 +299,13 @@ helper. Do not edit graphql in this worktree.
 
 ### WT-catches
 
-| | |
-| -- | -- |
-| **Maps** | I3 residual |
-| **Own** | `src/config.ts`, `src/commands/generate.ts`, `src/utils/env.ts`,
-  `src/commands/cookies.ts`, `src/utils/logger.ts`, `src/main.ts` (only catch-sites) |
-| **Depends** | WT-db merged (do not reintroduce silent query parse) |
-| **Avoid** | extract/graphql/llm/db (other areas own those catches) |
+|                                                                                    |                                                                  |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **Maps**                                                                           | I3 residual                                                      |
+| **Own**                                                                            | `src/config.ts`, `src/commands/generate.ts`, `src/utils/env.ts`, |
+| `src/commands/cookies.ts`, `src/utils/logger.ts`, `src/main.ts` (only catch-sites) |                                                                  |
+| **Depends**                                                                        | WT-db merged (do not reintroduce silent query parse)             |
+| **Avoid**                                                                          | extract/graphql/llm/db (other areas own those catches)           |
 
 **Acceptance**
 
@@ -357,7 +360,7 @@ cross modules. Own `tests/**` and fixture JSON only unless a tiny export is requ
 - [x] WT-llm
 - [x] WT-catches
 
-**Wave 2** -- not started
+**Wave 2** -- landed in `merge(wave2)` (2026-07-20)
 
-- [ ] WT-db-callers
-- [ ] WT-integration-tests
+- [x] WT-db-callers
+- [x] WT-integration-tests

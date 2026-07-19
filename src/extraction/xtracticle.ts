@@ -16,7 +16,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 
 /** Retry policy driven entirely by CONFIG (caller-owned numbers, no hidden defaults). */
 const xtracticleRetryPolicy = (): RetryPolicy => ({
-  maxAttempts: Math.max(1, CONFIG.maxRetries),
+  maxAttempts: CONFIG.maxExternalCallAttempts,
   baseDelayMs: CONFIG.retryBaseMs,
   jitter: true,
   retryOn: [500, 502, 503, 504],

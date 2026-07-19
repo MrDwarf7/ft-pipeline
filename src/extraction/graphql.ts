@@ -49,13 +49,13 @@ const sleep = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
-/** maxRetries is retries after the first try; RetryPolicy wants total attempts. */
+/** Shared external-call budget from CONFIG for all X GraphQL fetches. */
 const graphqlRetryPolicy = (): RetryPolicy => ({
-  maxAttempts: CONFIG.maxRetries + 1,
+  maxAttempts: CONFIG.maxExternalCallAttempts,
   baseDelayMs: CONFIG.retryBaseMs,
   jitter: true,
   retryOn: [500, 502, 503],
-  fetch: globalThis.fetch,
+  fetch: globalThis.fetch.bind(globalThis),
   sleep,
 });
 

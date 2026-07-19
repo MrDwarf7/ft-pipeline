@@ -22,6 +22,7 @@ export const ConfigSub = {
   File: "file",
   Init: "init",
   Set: "set",
+  Migrate: "migrate",
 } as const;
 
 export type ConfigSub = (typeof ConfigSub)[keyof typeof ConfigSub];

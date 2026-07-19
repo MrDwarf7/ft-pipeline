@@ -22,8 +22,11 @@ export interface SelectOpts {
 export interface Statement {
   /** Run a non-query statement with positional binds. */
   run(...params: SqlValue[]): void;
-  /** Run a query; returns parsed JSON rows. Empty success -> []. */
-  all<T = Record<string, unknown>>(...params: SqlValue[]): T[];
+  /**
+   * Run a query; returns untyped JSON rows. Empty success -> [].
+   * Callers must validate with zod (see parseRows in db-rows.ts) -- no generic cast.
+   */
+  all(...params: SqlValue[]): Record<string, unknown>[];
 }
 
 export interface Database {
@@ -138,11 +141,17 @@ const querySql = (
       `sqlite3 JSON parse failed: ${msg}; stdout=${stdout.slice(0, 200)}`,
     );
   }
+  const asRow = (row: unknown): Record<string, unknown> => {
+    if (row === null || typeof row !== "object" || Array.isArray(row)) {
+      throw new Error(`sqlite3 JSON: expected object row, got ${typeof row}`);
+    }
+    return row as Record<string, unknown>;
+  };
   if (Array.isArray(parsed)) {
-    return parsed as Record<string, unknown>[];
+    return parsed.map(asRow);
   }
   if (parsed !== null && typeof parsed === "object") {
-    return [parsed as Record<string, unknown>];
+    return [asRow(parsed)];
   }
   throw new Error(`sqlite3 JSON: expected array or object, got ${typeof parsed}`);
 };
@@ -260,8 +269,8 @@ class Sqlite3Statement implements Statement {
     execSql(this.dbPath, this.sql, params);
   }
 
-  all<T = Record<string, unknown>>(...params: SqlValue[]): T[] {
-    return querySql(this.dbPath, this.sql, params) as T[];
+  all(...params: SqlValue[]): Record<string, unknown>[] {
+    return querySql(this.dbPath, this.sql, params);
   }
 }
 
@@ -279,7 +288,7 @@ class TxStatement implements Statement {
     this.commands.push(...bindArgs(this.sql, params));
   }
 
-  all<T = Record<string, unknown>>(..._params: SqlValue[]): T[] {
+  all(..._params: SqlValue[]): Record<string, unknown>[] {
     throw new Error("select/all is not supported inside transaction()");
   }
 }
