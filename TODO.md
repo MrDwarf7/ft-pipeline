@@ -58,6 +58,9 @@ Details (historical briefs): [`docs/worktrees-immediate.md`](docs/worktrees-imme
   `deno.json` path layout. Revisit when stable; for now `--exclude-unused-npm` only.
 - **Move tests out of `src/`:** DONE -- unit tests live under `tests/unit/` (mirrors modules);
   fixtures under `tests/fixtures/`; `deno.json` tasks scan `tests/` only.
+- **Package managers (future):** Homebrew / Scoop / Chocolatey / AUR / other distros -- see
+  [Packaging / distro distribution](#packaging--distro-distribution-future). In-repo home will be
+  `packaging/` (templates); external taps/AUR packages when live.
 
 ### Historical task list (I0--I9) -- DONE (audit only)
 
@@ -102,6 +105,44 @@ Design docs under `docs/feature-parity/` and `docs/features/`.
 **Article images note (verified):** `extractArticleImages` + `buildMediaList` write remote markdown
 images into clippings. Remaining work is local download/reliability (F1/F7), not "totally ignored"
 as old B4 text claimed.
+
+---
+
+## Packaging / distro distribution (future)
+
+**Today:** `deno task install` drops a host binary on `XDG_BIN` / `XDG_BIN_HOME` / `~/.local/bin`
+(else leaves `dist/`). CI nightly publishes platform zips on the GitHub `nightly` release. That is
+enough for manual install; package-manager channels are **not** wired yet.
+
+**Wanted later (backlog -- not started):**
+
+| Channel                         | Typical home                                                          | Notes                                                          |
+| ------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Homebrew                        | External tap (`homebrew-ft-pipeline` or similar) + optional formula stub here | Formula can `url` nightly/release assets                       |
+| Scoop (Windows)                 | Scoop bucket repo or `bucket/` snippet                                | Point at Windows zip from releases                             |
+| Chocolatey                      | `packaging/chocolatey/` nuspec + tools scripts                        | Needs package maintainer + moderation                          |
+| AUR (Arch)                      | Usually a **separate** AUR git package; keep a template here          | `PKGBUILD` + `.SRCINFO` template under packaging               |
+| Other distros (deb/rpm/nix/…)   | Same packaging tree when we care                                      | Prefer release artifacts over building Deno on every target    |
+
+**In-repo layout convention (when we start):**
+
+```
+packaging/                 # source-of-truth templates + maintainer notes
+  README.md                # which channels are live, how to bump, where external repos live
+  aur/                     # PKGBUILD template (publish from separate AUR package repo)
+  homebrew/                # formula stub or pointer to the tap
+  scoop/                   # bucket manifest template
+  chocolatey/              # nuspec + tools/
+  # later: deb/, rpm/, nix/ as needed
+```
+
+Rationale: most of these channels eventually live in **external** repos (AUR, brew tap, scoop
+bucket, choco gallery). Keeping a `packaging/` tree in this repo is the common "templates + docs"
+pattern so agents/humans do not invent paths. Do **not** dump formulas into repo root; do not
+pretend AUR lives only here.
+
+**Out of scope until someone owns a channel:** auto-publish to every store on every tag. Nightly
+GitHub release assets stay the primary binary distribution.
 
 ---
 
