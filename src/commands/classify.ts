@@ -75,18 +75,23 @@ const classifyRow = async (
   return "classified";
 };
 
-// deno-lint-ignore no-unused-vars
+/** Map a rejected classify promise to "failed" so one row cannot kill the batch. */
+export const settleClassify = (
+  tweetId: string,
+  work: Promise<ClassifyResult>,
+): Promise<ClassifyResult> =>
+  work.catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error("classify failed", { tweet_id: tweetId, error: msg });
+    return "failed" as const;
+  });
+
 const processRow = (
   db: Database,
   llm: ConnectedLLM,
   row: Row,
   allResults: Array<{ tweet_id: string } & ClassificationResult>,
-): Promise<ClassifyResult> =>
-  classifyRow(db, llm, row, allResults).catch((err) => {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error("classify failed", { tweet_id: row.tweet_id, error: msg });
-    return "failed" as const;
-  });
+): Promise<ClassifyResult> => settleClassify(row.tweet_id, classifyRow(db, llm, row, allResults));
 
 const processBatch = (
   db: Database,
@@ -101,7 +106,7 @@ const processBatch = (
     total: totalBatches,
     size: rows.length,
   });
-  return Promise.all(rows.map((row) => classifyRow(db, llm, row, allResults)));
+  return Promise.all(rows.map((row) => processRow(db, llm, row, allResults)));
 };
 
 const summarize = (results: ClassifyResult[]) => {
