@@ -65,6 +65,7 @@ See `docs/_fixes/` for detailed fix specifications:
 | File                                                | Description                                   |
 | --------------------------------------------------- | --------------------------------------------- |
 | [`TODO.md`](../TODO.md)                             | Active TODO list                              |
+| [`worktrees-immediate.md`](worktrees-immediate.md)  | Parallel worktree map + agent briefs (I0-I9)  |
 | [`AGENTS.md`](../AGENTS.md)                         | Project structure, conventions, doc standards |
 | [`src/config.ts`](../src/config.ts)                 | Paths, thresholds, taxonomy                   |
 | [`src/main.ts`](../src/main.ts)                     | CLI entry point                               |

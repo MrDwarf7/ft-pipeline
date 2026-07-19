@@ -2,406 +2,360 @@
 
 Agreed pipeline order: **SYNC -> EXTRACT -> MERGE -> CLASSIFY -> GENERATE -> INDEXES**
 
----
-
-## Migration Complete (2026-06-12)
-
-The pipeline now writes generated content directly to the wiki.
-
-**What changed:**
-
-- **Output dir** -- `mdOutputDir` moved from `~/.config/ft-pipeline/output/` to `~/StoneVault/wiki/`
-  - Bookmark pages -> `wiki/bookmarks/`
-  - Category indexes -> `wiki/categories/`
-  - Domain indexes -> `wiki/domains/`
-  - Entity pages -> `wiki/entities/`
-  - Master index -> `wiki/index.md`
-- **Cron agent integration** -- generated notes land directly in the wiki where the gardener cron
-  can find and process them. No intermediary folder.
-- **`~/.config/ft-pipeline/`** -- now purely for DB, cookies, logs, and pipeline internals. No
-  generated content.
-
-**Previous migration (2026-06-05):**
-
-- **DB ownership** -- `pipeline.db` at `~/.config/ft-pipeline/pipeline.db`
-- **Generate step** -- shell-out to `ft-cli` removed, replaced with pure-Deno implementation
-- **Cookies** -- `.sync-cookies.enc` moved to `~/.config/ft-pipeline/`
-- **Log dir** -- logs now go to `~/.config/ft-pipeline/logs/`
-- **Classification results** -- now at `~/.config/ft-pipeline/classification-results.json`
-- **Config** -- all `.ft-bookmarks` references stripped
-- **Logging** -- daily rotation changed to **time-based** (`YYYY-MM-DD_HH-MM-SS.log`)
-- **Indexing** -- now uses **SHA-256 hash comparison** before writing (saves disk I/O)
+Verified against `src/` on **2026-07-20**. Historical "we did X on date Y" write-ups live in
+`docs/completed/` and `docs/_fixes/` -- not duplicated here.
 
 ---
 
-## Logging Fix (2026-06-05)
+## Current pipeline status (code reality)
 
-**Problem:** Log files were named only by date (`pipeline-YYYY-MM-DD.log`), causing overwrites when
-multiple pipeline runs occurred within the same day.
+| Step     | Status | Notes |
+| -------- | ------ | ----- |
+| Sync     | OK     | Native GraphQL (`extraction/graphql.ts`). Leaf tweet Zod; timeline walk still cast-heavy. 429/retry exists **only here**. |
+| Extract  | OK*    | xtracticle -> Clippings. Article images **are** embedded as remote `![](url)` in clippings (B4 partially done). Still casty; no shared 429 handler; no raw-JSON archive. |
+| Merge    | OK     | Clippings -> `clippings_text`. |
+| Classify | OK*    | Per-item failure **intended** to log and continue; see **I0** -- batch path currently bypasses that. Continue-on-step-failure in `runFull` is **desired**. |
+| Generate | OK     | Template render from `pipeline.db`. |
+| Indexes  | OK*    | Hash caching works. Entity null-handle filter exists. Indexes use **primary_** only (multi-label backlog). |
 
-**Solution:**
+\* = open quality/robustness work below, not "broken end-to-end."
 
-- Changed filename format to `pipeline-YYYY-MM-DD_HH-MM-SS.log`
-- Added `logTime` state variable alongside `logDate`
-- Updated file stream check to compare both date AND time
-- Added `logTime` to the `getLogFile()` function signature
-
-**Files modified:**
-
-- `src/utils/logger.ts` -- updated `getLogFile()` and added `logTime` state
-
-**Tested:** Full pipeline run confirms unique log files per run.
-
----
-
-## Indexing Hash Caching (2026-06-05)
-
-**Problem:** Index files were rewritten on every run, even when content hadn't changed, wasting disk
-I/O and causing unnecessary writes.
-
-**Solution:**
-
-- Created new utility `src/utils/hash.ts` with SHA-256 hashing functions:
-  - `hashFile()` -- reads file in chunks and computes hash (memory efficient)
-  - `hashContent()` / `hashContentSync()` -- hashes string content
-  - `hashesMatch()` -- compare two hash strings
-  - `needsUpdate()` -- check if existing file needs updating
-- Modified `src/commands/indexes.ts` to:
-  - Compare content hashes before writing
-  - Only write file if hash differs (or file doesn't exist)
-  - Log "updated" vs "unchanged" for each page type
-  - Use base directory (`categories/`, `domains/`, `entities/`) for hash comparison
-
-**Files created/modified:**
-
-- `src/utils/hash.ts` (new file)
-- `src/commands/indexes.ts` (updated with hash comparison)
-
-**Performance:** Expected ~5-10x I/O reduction on subsequent runs when data is static.
+**Config:** file + env + zod (`config` command: show/file/init/set).  
+**Tests:** not empty -- `deno task test` / `test:unit` / `test:e2e` exist; coverage is thin (see I4).  
+**Dead files still in tree:** `src/options.ts` (tombstone), `src/utils/ft-cli.ts` (throws only).
 
 ---
 
-## Bug Fixes (2026-06-12)
+## Immediate work (do these first)
 
-1. **Sync log levels** -- page-result logging in `graphql.ts` changed from `logger.error()` to
-   `logger.info()`. "All already in DB" is normal caught-up behavior, not an error.
-2. **Hash file read race** -- `hashFile()` in `hash.ts` used `Array.from()` with async callbacks but
-   never awaited the promises. File reads were fire-and-forget, causing "Interrupted: operation
-   canceled" errors. Fixed by collecting promises and `Promise.all`-ing them.
-3. **Hash hex conversion bug** -- `getUint8(0)` always read byte 0 instead of iterating. Fixed with
-   `Uint8Array` + `Array.from` mapping each byte.
+Maintainability + robustness. Feature parity (media/folders/fallback) waits until this layer is
+sound. Order is dependency-aware.
 
----
+### I0 -- Classify: actually survive per-item LLM failures
 
-## Next: Feature Parity (3 features + tests)
+**Intent (product):** One overloaded/local model failure on a single tweet must **log and continue**.
+We do **not** want the whole classify step (or full pipeline) to die because one item flaked.
 
-### 1. Media Download
+**Code reality today:**
 
-- Download tweet media (images, videos) to `_Attachments/`
-- Configurable path via `FT_MEDIA_DIR`, size cap via `FT_MEDIA_MAX_BYTES`
-- Design doc: `docs/feature-parity/media-download.md`
+- `processRow` in `src/commands/classify.ts` wraps `classifyRow` in `.catch` -> logs + returns
+  `"failed"`.
+- `processBatch` maps **`classifyRow` directly** and never calls `processRow` (`processRow` is
+  effectively dead; `deno-lint-ignore no-unused-vars`).
+- So a throw from `classifyRow` rejects the `Promise.all` and can abort the batch/command.
 
-### 2. Bookmark Folders
+**Do:**
 
-- Sync folder/structure from X, tag bookmarks with folder membership
-- Design doc: `docs/feature-parity/bookmark-folders.md`
+- [ ] Wire batch processing through the catch path (or inline the same catch); delete unused
+      `processRow` lint-ignore dead code.
+- [ ] Keep run-level summary: `classified` / `failed` counts + results JSON backup.
+- [ ] Confirm `runFull` still continues past classify step failure (desired); polish hints only
+      if misleading (data-driven table optional, not blocking).
 
-### 3. LLM Fallback Chain
-
-- Primary: local model at `localhost:1234` (already works)
-- Fallback: ordered list of providers/models, similar to hermes-agent's fallback_providers
-- Config: `fallbackProviders` array in config, each entry has `{ baseUrl, model, provider? }`
-- On classify failure, try next provider in chain before giving up
-- Reference: hermes-agent's `fallback_providers` in Python config
-
-### 4. Test Suite
-
-- Deno test framework (built-in `Deno.test`) as baseline
-- Consider vitest for more advanced features (mocking, snapshots, coverage) if Deno's built-in is
-  insufficient
-- Cover: sync pagination, classify merge logic, generate template rendering, hash utilities, config
-  resolution
-- Target: critical path coverage first, edge cases second
+**Out of scope here:** fail-fast for classify (we do not want that).
 
 ---
 
-## Not Implemented / Backlog
+### I1 -- Delete dead code + doc drift
 
-### "null" Entity Page Issue (2026-06-05)
-
-**Problem:** Some entity pages are being created with `handle: "null"` (literally the string
-`"null"` instead of a valid handle), causing malformed paths like `entities/null.md`.
-
-**Root cause:** DB records where `author_handle` is `NULL` or empty, and we're converting it to the
-string `"null"` somewhere in the pipeline.
-
-**Solution (2026-06-05):**
-
-- Added null-safety check in `queryBookmarks()` in `src/commands/indexes.ts`:
-
-  ```sql
-  WHERE primary_type IS NOT NULL
-    AND (author_handle IS NOT NULL AND author_handle != '')
-  ```
-
-- This filters out records where `author_handle` is `NULL` or empty string
-
-**Impact:**
-
-- File path: `entities/null.md`
-- May cause link breaks in Obsidian
-- Could cascade into other pages referencing these entities
-
-**Priority:** Medium -- affects data quality, not core pipeline flow. **Status:** Fixed
+- [ ] Delete `src/options.ts` (options live on CLI tree; tombstone only).
+- [ ] Delete `src/utils/ft-cli.ts` (no importers; throws if called).
+- [ ] Update `AGENTS.md` project tree: remove `ft-cli.ts`; fix `cli-schema.ts` ->
+      `cli-schema.tree.ts` + `cli-schema.types.ts` (+ `consts.ts` as needed).
 
 ---
 
-### Step 1: Folder Sync / Gaps Mode
+### I2 -- DB access: safe runner + table helpers (no Prisma)
 
-- **Folder sync** -- sync bookmark folders/structure from X (design doc at
-  `docs/feature-parity/bookmark-folders.md`)
-- **Gaps mode** -- backfill missing bookmarks (sync flags exist but not wired to folder sync)
-- Not needed for daily pipeline run, but needed for full ft-cli feature parity
+Stay on Deno + `sqlite3` CLI subprocess. Stop treating the DB as "build a string, hope JSON comes
+back." Add the normal-backend helpers this codebase actually needs (one main table, no joins).
 
----
+**Today (`src/utils/db.ts`):**
 
-### Step 2: Schema-Change Detection / Hard Crash
+- Params interpolated into SQL via quoting (`interpolate`).
+- `querySql` uses `.mode json` + `JSON.parse`; **parse failure returns `[]` silently**.
+- Call sites cast rows with `as T[]`.
 
-**Problem:** When X changes their GraphQL response structure, the Zod schemas in
-`src/extraction/schema.ts` silently produce empty/malformed data instead of alerting us.
+**Target shape (see `docs/worktrees-immediate.md` WT-db + DB API section):**
 
-**Proposed approach:**
+```text
+sqlite3 CLI
+  -> runner (bind via .parameter, exec, JSON rows, throw on failure)
+  -> Database: prepare/run/all + insert/upsert/update/select + transaction
+  -> commands
+```
 
-- Add a **post-parse validation** step that checks basic invariants after Zod parsing (e.g.
-  `bookmarks.length > 0`, `text !== ""` on a known bookmark)
-- If invariants fail, **hard-crash** with a clear message:
+**Do (WT-db core):**
 
-  ```
-  X API response structure changed -- Zod schema in schema.ts likely outdated.
-  Check raw response vs Zod schema and update.
-  ```
+- [ ] Real binds: sqlite3 `.parameter set ?N value` (CLI 3.53+ supports this) -- not string glue.
+- [ ] `querySql` / exec: **never** swallow parse or nonzero-exit -- throw with stderr + context.
+      Empty result set is still `[]`.
+- [ ] Public helpers on `Database` (equality-only `where`; identifiers are our literals only):
+  - `insert(table, row)`
+  - `upsert(table, row, conflictColumns)`
+  - `update(table, set, where)` 
+  - `select(table, { columns, where?, orderBy?, limit? })` / `selectOne(...)`
+- [ ] Keep `prepare` / `exec` escape hatch for migrate DDL and complex SELECTs (indexes/generate).
+- [ ] `transaction(fn)` via BEGIN/COMMIT/ROLLBACK (still CLI).
+- [ ] Params always `readonly SqlValue[]` on prepare path -- drop spread-or-array dual API.
+- [ ] Tests for binds, empty success, bad JSON throws, upsert/update helpers.
+- [ ] Doc-comment the public API (AGENTS doc form).
 
-- Log the raw response JSON to a debug file before crashing so we can inspect it
+**Later (WT-db-callers):** migrate sync/extract/merge/classify-db call sites to helpers + zod rows.
 
----
-
-### Step 3: EXTRACT -- Article Images (P2)
-
-- [ ] Article images from xtracticle (`article.cover_media`, `article.media_entities`) not saved to
-      clippings (only `tweet.media.all` is processed)
-- [ ] xtracticle API responses can be truncated -- should save raw JSON first
-- [ ] Smarter 429 retry with exponential backoff
-
----
-
-### Step 4: LLM Health Check -- Not Robust Enough
-
-**Problem:** `check()` in `src/llm/openai-compat.ts` only pings `/models` -- it verifies the server
-is running and a model is loaded, but doesn't validate that the model can _actually produce
-inference_. This means the classify loop can start, get N items in, then hit a silent failure.
-
-**To fix:**
-
-- After the `/models` check passes, run a **tiny inference test** (e.g. "Say hello") with a short
-  timeout
-- If inference fails (empty response, gibberish, timeout), throw before entering the classify loop
+**Not doing:** Prisma / drizzle / join builders / relations.
 
 ---
 
-### Step 5: Index Pages -- Multi-Type / Multi-Domain Display
+### I3 -- Silent `catch {}`: fix the failure mode, not only log
 
-**Problem:** Index pages (`categories/`, `domains/`) only show `primary_type` and `primary_domain`
--- the full `types`/`domains` JSON arrays from the DB are ignored.
+Prefer making the operation correct or failing closed with a typed outcome. Logging alone is not
+the goal.
 
-**To fix:**
+High-signal sites to clear:
 
-- Include secondary types/domains in index listings
-- Maybe split "purely this" vs "also this" sections
+| Area | Today | Target |
+| ---- | ----- | ------ |
+| `db.querySql` JSON parse | `[]` | throw / explicit error |
+| extract frontmatter / dir walks | null / skip | distinguish missing file vs corrupt |
+| generate "no rows" / missing dir | `[]` / empty set | OK if intentional; don't hide SQL/parse errors behind same path |
+| config load | fallback defaults | OK for missing file; fail loud on **invalid** JSONC (zod already helps on parse path -- verify) |
 
----
-
-## Summary Table
-
-|   | Step           | Status            | Remaining Work                                     |
-| - | -------------- | ----------------- | -------------------------------------------------- |
-|   | Sync           | OK                | Works -- needs schema-change detection added       |
-|   | Extract        | OK (mostly)       | Article images not captured (P2), schema detection |
-|   | Merge          | OK                | Works                                              |
-|   | Classify       | OK                | Works -- needs better LLM health check             |
-|   | Generate       | OK                | Works (template closures, no ft-cli)               |
-|   | Indexes        | OK (hash caching) | Works -- needs multi-type/domain display           |
-|   | Logging        | OK (time-based)   | Works                                              |
-|   | "null" issue   | Fixed             | Null-safety added in entity page generation        |
-|   | Folder sync    | Missing           | Design doc exists, no code                         |
-|   | Gaps mode      | Missing           | Backfill missing bookmarks                         |
-|   | Media download | Missing           | Feature parity -- download tweet media             |
-|   | LLM fallback   | Missing           | Feature parity -- fallback provider chain          |
-|   | Tests          | Missing           | No test suite exists                               |
-
-## Priority Order
-
-1. **Test suite** -- foundation for everything else, catch regressions
-2. **LLM fallback chain** -- classify resilience, P1
-3. **Media download** -- feature parity, P2
-4. **Bookmark folders** -- feature parity, P2
-5. **Schema-change detection** -- hard-crash on X API format changes
-6. **LLM health check** -- actual inference test before classify
-7. **Multi-type/domain index display** -- P2
-8. **Extract article images** -- P2
+- [ ] Audit every empty `catch` in `src/` and either handle the specific errno/case or rethrow.
+- [ ] Pair with I2 so SQL "success with empty" is not confused with "driver failed."
 
 ---
 
-## Appendix A: Hard-Coded Values Audit
+### I4 -- Shared HTTP policy: 429 / rate limits / retries
 
-Compiled 2026-06-05. These are places where fixed values, URLs, or thresholds are baked into the
-code that _could_ be configurable via env vars / flags. Not all need to be extracted -- some are
-just fine as consts. The ones flagged red are most likely to need changing or break on API changes.
+**Today:** GraphQL has 429 + Retry-After + backoff (`extraction/graphql.ts`). Extract (xtracticle)
+and LLM client do **not** share that. Config already has `maxRetries` / `retryBaseMs` but they are
+not a single middleware.
 
-### `src/extraction/graphql.ts` -- X GraphQL Client
+**Do:**
 
-| Line(s) | Value                                           | Concern                                   | Priority |
-| ------- | ----------------------------------------------- | ----------------------------------------- | -------- |
-| ~12     | `BOOKMARKS_QUERY_ID = "Z9GWmP0kP2dajyckAaDUBw"` | X changes query IDs periodically          | High     |
-| ~11     | `BOOKMARKS_OPERATION = "Bookmarks"`             | Operation name, less volatile             | Medium   |
-| ~13-14  | `X_PUBLIC_BEARER = "AAAAAAAAAAA...CpTnA"`       | Public bearer token, changes periodically | High     |
-| ~17-34  | `GRAPHQL_FEATURES = {...}` (15 feature flags)   | X changes feature flags format            | High     |
-| ~210    | `500 + Math.random() * 1000` jitter             | Timing between page fetches               | Low      |
-| ~229    | `attempt >= 4` max retries                      | Retry limit                               | Low      |
-| ~230    | `15 * Math.pow(2, attempt)` capped at 120s      | Backoff formula                           | Low      |
-| ~238    | `stalePages >= 2`                               | Stop after 2 empty pages                  | Medium   |
-| ~373    | `count = 200`                                   | Page size                                 | Low      |
-
-### `src/commands/sync.ts`
-
-| Line(s) | Value            | Concern                 | Priority |
-| ------- | ---------------- | ----------------------- | -------- |
-| 114     | `limit: 1000`    | Max bookmarks per sync  | Low      |
-| ~120    | `concurrency: 3` | API request concurrency | Low      |
-
-### `src/utils/bases.ts` -- Paths & URLs
-
-| Line(s) | Value                                       | Concern                         | Priority |
-| ------- | ------------------------------------------- | ------------------------------- | -------- |
-| 23      | `Deno.env.get("HOME")`                      | Home dir root for vault paths   | Medium   |
-| 28-30   | `xdgConfig`, `xdgData`, `xdgCache`          | XDG base dirs via `xdg-basedir` | Medium   |
-| 34-36   | `appConfigDir`, `appDataDir`, `appCacheDir` | App-specific XDG subdirs        | Medium   |
-| 34      | `~/.config/ft-pipeline`                     | Config root (via XDG)           | Medium   |
-| 35      | `~/.local/share/ft-pipeline`                | Data root (via XDG)             | Low      |
-| 36      | `~/.cache/ft-pipeline`                      | Cache root (via XDG)            | Low      |
-| 71      | `~/StoneVault/Clippings`                    | Vault clippings dir             | Medium   |
-| 74      | `https://xtracticle.com/api/thread`         | Xtracticle API URL              | Medium   |
-| 75      | `http://localhost:1234/v1`                  | LLM server URL                  | Medium   |
-| 76      | `Gemma-4-E4B-...-Q4_K_M.gguf`               | LLM model name (now env-driven) | Medium   |
-
-### `src/config.ts` -- App Settings
-
-| Line(s) | Value                                   | Concern                                       | Priority |
-| ------- | --------------------------------------- | --------------------------------------------- | -------- |
-| 40      | `syncDelayMs: 600`                      | Delay between sync operations                 | Low      |
-| 41      | `extractDelayMs: 750`                   | Delay between extracts                        | Low      |
-| 42      | `extractJitterMs: 400`                  | Jitter range                                  | Low      |
-| 45      | `minPostTextLength: 200`                | Min text for short-tweet detection            | Low      |
-| 46      | `maxRetries: 3`                         | Retry count                                   | Low      |
-| 47      | `retryBaseMs: 2000`                     | Retry base interval                           | Low      |
-| 48      | `classificationBatchSize: 50`           | Classify batch size                           | Low      |
-| 51-55   | `clippingDirs` (articles, posts, media) | Output dir names                              | Low      |
-| 68-95   | `TYPES` / `DOMAINS` arrays              | Taxonomy -- adding new ones needs code change | Medium   |
-
-### `src/llm/openai-compat.ts` -- Default LLM Params
-
-| Line(s) | Value                                 | Concern                  | Priority |
-| ------- | ------------------------------------- | ------------------------ | -------- |
-| 26-31   | `temperature: 0.3`, `max_tokens: 200` | Default inference params | Low      |
-| 33-46   | `jsonMode: "json_object"`             | Default JSON mode        | Low      |
-
-### `src/commands/classify-llm.ts` -- Classification LLM Params
-
-| Line(s) | Value                        | Concern                      | Priority |
-| ------- | ---------------------------- | ---------------------------- | -------- |
-| 16      | `CONFIDENCE_THRESHOLD = 0.7` | Low confidence warning       | Low      |
-| 72      | `content.slice(0, 2000)`     | Content truncation length    | Low      |
-| 128     | `temperature: 0.1`           | Classify-specific temp       | Low      |
-| 129     | `maxTokens: 500`             | Classify-specific max tokens | Low      |
-
-### `src/commands/classify.ts` -- Classify Runtime
-
-| Line(s) | Value                        | Concern                        | Priority |
-| ------- | ---------------------------- | ------------------------------ | -------- |
-| 41      | `content.trim().length < 10` | Short tweet threshold          | Low      |
-| 74      | `setTimeout(r, 200)`         | Rate limiter between LLM calls | Low      |
-
-### `src/commands/extract.ts`
-
-| Line(s) | Value             | Concern            | Priority |
-| ------- | ----------------- | ------------------ | -------- |
-| ~543    | `BATCH_SIZE = 10` | Extract batch size | Low      |
-
-### `src/commands/generate.ts` -- Rendering
-
-| Line(s) | Value                       | Concern                  | Priority |
-| ------- | --------------------------- | ------------------------ | -------- |
-| 37      | `slugify` maxLen = 60       | Filename slug length     | Low      |
-| 78      | `firstLine.slice(0, 120)`   | Title truncation         | Low      |
-| 131     | `display_text.slice(0, 80)` | Filename text truncation | Low      |
-| 178     | `BATCH_SIZE = 50`           | Write batch size         | Low      |
+- [ ] Add a small shared helper (e.g. `src/utils/http.ts` or `fetch-with-retry.ts`): honor 429 +
+      `Retry-After`, exponential backoff, max attempts, jitter; return clear errors after exhaustion.
+- [ ] Use it for: X GraphQL, xtracticle extract, LLM `/models` + `/chat/completions`.
+- [ ] Drive defaults from `CONFIG` (`maxRetries`, `retryBaseMs`) -- callers pass overrides, no
+      hidden default params in TS function signatures (project rule).
 
 ---
 
-### `src/commands/indexes.ts` -- Index Pages (Post-Hash Caching)
+### I5 -- Boundary validation (Zod where we already half-do it)
 
-| Line(s) | Value                     | Concern                       | Priority |
-| ------- | ------------------------- | ----------------------------- | -------- |
-| 78      | `topByLikes.slice(0, 50)` | Top by engagement limit       | Low      |
-| 87      | `slice(0, 20)`            | Recent entries per page       | Low      |
-| 126     | `slice(0, 20)`            | Top authors per page          | Low      |
-| 197     | `ENTITY_THRESHOLD = 5`    | Min bookmarks for entity page | Low      |
-| 254     | `slice(0, 50)`            | Top entities on master index  | Low      |
-
-**Post-hash-caching (2026-06-05):**
-
-- Now uses `needsUpdate()` from `src/utils/hash.ts`
-- Compares SHA-256 hashes before writing
-- Logs "updated" vs "unchanged" for each page type
+- [ ] **GraphQL timeline envelope** (`parseResponse`): Zod for
+      `data.bookmark_timeline_v2.timeline.instructions` / entries, not only leaf `TweetDataSchema`.
+      Log drop counts (seen / parsed / skipped) so silent empty sync is obvious.
+- [ ] **xtracticle thread response:** Zod for the shapes extract actually reads (tweet, article
+      blocks, cover_media, media_entities) -- kill `as Record` spray in `extract.ts`.
+- [ ] **LLM OpenAI-compat responses:** validate `/models` and chat completion JSON; reject empty
+      assistant content instead of `""`.
+- [ ] Schema-drift **hard fail** when envelope parse fails or a full page yields zero parseable
+      tweets while API returned entries (see old "Step 2" -- still valid, re-homed here).
 
 ---
 
-### `src/utils/hash.ts` -- SHA-256 Hashing Utilities
+### I6 -- Migrations that don't DROP the world
 
-| Line(s) | Value                | Concern                         | Priority |
-| ------- | -------------------- | ------------------------------- | -------- |
-| 1-10    | `CHUNK_SIZE = 65536` | Read chunk size for large files | Low      |
-| 14-18   | `hashFile()`         | File hashing (chunked read)     | Low      |
-| 21-28   | `hashContent()`      | Async content hashing           | Low      |
-| 31-38   | `hashContentSync()`  | Sync content hashing            | Low      |
-| 41-45   | `hashesMatch()`      | Hash comparison                 | Low      |
-| 48-77   | `needsUpdate()`      | Check if file needs updating    | Medium   |
+**Today (`migrate.ts`):** magic column counts `21` / `20`; wrong count -> `DROP TABLE bookmarks`.
+`migration_runs` table exists but is not a real ordered migration ledger.
 
-**Usage:**
+**Do:**
 
-```typescript
-const needsUpdate = await needsUpdate(
-  existingPath, // Full path to existing file
-  baseDir, // Base directory for relative paths
-  newContent, // New content to write
-);
-if (needsUpdate) {
-  await Deno.writeTextFile(existingPath, newContent);
-}
+- [ ] Versioned migrations (name + applied set); add columns by existence check, not total count.
+- [ ] Never DROP user data without an explicit destructive flag.
+- [ ] Prepare path for upcoming columns (folders, media paths) without rewrite chaos.
+
+---
+
+### I7 -- Split god-files (brittle multi-concern modules)
+
+Split along pure vs I/O boundaries. No behavior change required in the first pass.
+
+| File | ~LOC | Split toward |
+| ---- | ---- | ------------ |
+| `commands/extract.ts` | ~566 | client / classifyTweet / clipping writer / db updates |
+| `extraction/graphql.ts` | ~412 | fetch+retry / parse envelope / map tweet |
+| `commands/indexes.ts` | ~390 | query -> view-model -> markdown -> hash write |
+
+- [ ] extract: also resolve open batching TODO (`allResults` / reduce) while splitting if cheap.
+- [ ] Keep public `runExtract` / `runIndexes` / `createGraphQL` entrypoints stable for `main` /
+      pipeline.
+
+---
+
+### I8 -- Tests for the risky paths (expand what exists)
+
+Suite already has: `cli-schema_test`, `classify-llm_test`, `schema_test`, `frontmatter_test`,
+`hash_test`, plus e2e task. "No tests" in older notes is **stale**.
+
+**Add first (fixtures > mocks):**
+
+- [ ] GraphQL `parseResponse` + pagination/staleness (saved raw JSON fixtures).
+- [ ] extract `classifyTweet` + article image URL extraction.
+- [ ] merge priority (articles > posts > media).
+- [ ] config resolution order (env > file > defaults).
+- [ ] `parseDate` edge cases (`utils/datetime.ts`).
+- [ ] classify per-item failure does not reject the batch (locks I0).
+- [ ] DB helper: bad SQL / bad JSON must not look like empty success (locks I2).
+
+---
+
+### I9 -- LLM client hygiene (local-first, still strict)
+
+Product still allows classify to miss items (I0). Client should not be sloppy.
+
+- [ ] Remove `?? 0.3` / `?? 200` / default `jsonMode` inside `openai-compat` -- caller always passes
+      (project: no default params; classify already passes temp/maxTokens).
+- [ ] Tiny inference probe after `/models` (optional but useful): prove the model can answer before
+      burning a full batch (old "Step 4").
+- [ ] LLM **fallback chain** stays in feature backlog (F2), not blocking I0--I8.
+
+---
+
+### Immediate order (linear reference)
+
+I-ids above are the work *content*. **Execution is by worktree area** (next section), not
+strictly I0→I9. Linear map for humans:
+
+```
+I1 dead code / I0 classify / I2 db / I6 migrate / I4 http-core  -- wave 0 parallel
+I3 residual catches (non-owned files)                            -- after wave 0
+I4 wire + I5 zod + I9 llm + I7 splits                            -- wave 1 by area
+I8 tests                                                         -- land with each area
 ```
 
 ---
 
-## Top Candidates for Config-ification
+## Worktree map (spawn agents here)
 
-These are the values most likely to need changing or cause issues:
+Parallel isolation: **one jj workspace per area**, exclusive file ownership, commit only your
+filesets, do not merge. Orchestrator reintegrates with `jj new <rev1> <rev2> ...`.
 
-1. **X API query ID** (`graphql.ts`) -- changes periodically, currently a blind mutation
-2. **X public bearer token** (`graphql.ts`) -- rotates, causes silent failures
-3. **Feature flags** (`graphql.ts` GRAPHQL_FEATURES) -- most frequent source of breakage
-4. **LLM model name** (`bases.ts`) -- swapped when testing different models
-5. **LLM server URL/port** (`bases.ts`) -- if port or host changes
-6. **Taxonomy** (`config.ts` TYPES/DOMAINS) -- adding types needs code change
-7. **Paths** (`bases.ts`) -- now XDG-compliant by default; respects XDG_* env vars. Vault paths
-   derive from $HOME.
+Full agent briefs: [`docs/worktrees-immediate.md`](docs/worktrees-immediate.md).
 
-See `AGENTS.md` for project structure and pipeline entry points.
+### Wave 0 -- no cross-deps (spawn all at once)
+
+| Area ID | Maps to | Exclusive own | Do not touch | Done when |
+| ------- | ------- | ------------- | ------------ | --------- |
+| **WT-hygiene** | I1 | delete `src/options.ts`, `src/utils/ft-cli.ts`; edit `AGENTS.md` (tree only) | any runtime code | files gone; AGENTS tree accurate; `deno task ch:all` |
+| **WT-classify** | I0 + I8(classify) | `src/commands/classify.ts`, optional `src/commands/classify*_test.ts` | classify-llm, llm/, pipeline | batch uses catch path; no unused `processRow` lint-ignore; test that throw → `"failed"` not reject; `ch:all` |
+| **WT-db** | I2 core + I8(db) | `src/utils/db.ts`, add `src/utils/db_test.ts` | command files (no mass call-site rewrite yet) | binds + throw-on-parse; `insert`/`upsert`/`update`/`select`/`transaction`; prepare/exec escape hatch; tests + API docs; `ch:all` |
+| **WT-migrate** | I6 | `src/commands/migrate.ts` | db.ts (use existing API) | no DROP-on-count; column-existence migrations; optional version ledger; `ch:all` |
+| **WT-http** | I4 create only | **new** `src/utils/http.ts`, `src/utils/http_test.ts` | graphql/extract/llm (no wire yet) | `fetchWithRetry` (or equiv): 429 + Retry-After, backoff, max attempts, jitter; options **required** from caller (no default params); unit tests; `ch:all` |
+| **WT-indexes** | I7 indexes | `src/commands/indexes.ts` → split under e.g. `src/commands/indexes/` or `src/indexes/*` | extract, graphql | pure query/view/markdown/write modules; `runIndexes` entry stable; `ch:all` |
+| **WT-tests-pure** | I8 pure | new tests only: `src/utils/datetime_test.ts`, `src/config_test.ts` (or `src/commands/merge_test.ts` for priority) | production logic unless bugfix trivial | tests pass under `deno task test:unit` |
+
+### Wave 1 -- after Wave 0 merged (especially **WT-http** + **WT-db**)
+
+Each area wires shared http + zod + split in **one owner** to avoid dual-edit of big files.
+
+| Area ID | Maps to | Exclusive own | Depends on | Done when |
+| ------- | ------- | ------------- | ---------- | --------- |
+| **WT-sync** | I4 wire GraphQL + I5 GraphQL envelope + I7 graphql split | `src/extraction/**` (graphql, schema, types, index, tests/fixtures) | WT-http | timeline Zod; drop counts; uses shared fetch retry; optional file split; fixtures/tests; hard-fail on envelope drift; `ch:all` |
+| **WT-extract** | I4 wire xtracticle + I5 xtracticle Zod + I7 extract split + extract I3 catches | `src/commands/extract.ts` and any new `src/commands/extract/*` or `src/extraction/xtracticle*.ts` | WT-http | Zod for xtracticle shapes; no cast spray; uses shared retry; split modules; intentional skips typed; batch TODO if cheap; `ch:all` |
+| **WT-llm** | I4 wire LLM + I5 LLM Zod + I9 | `src/llm/**`, touch `src/commands/classify-llm.ts` only if call-site must pass explicit chat options | WT-http | no hidden defaults in openai-compat; validated responses; empty content errors; optional probe; uses shared retry; `ch:all` |
+| **WT-catches** | I3 residual | `src/config.ts`, `src/commands/generate.ts`, `src/utils/env.ts`, `src/commands/cookies.ts`, `src/utils/logger.ts`, `src/main.ts` as needed | WT-db (don't re-break db) | no silent empty-catch hiding real errors; missing-file vs corrupt distinguished; `ch:all` |
+
+### Wave 2 -- after Wave 1
+
+| Area ID | Maps to | Own | Done when |
+| ------- | ------- | --- | --------- |
+| **WT-db-callers** | I2 row typing | command DB call sites (`classify-db`, `sync`, `merge`, `generate`, `indexes` queries) -- **serialize or one agent** | zod/parse helpers at boundaries; no bare `as T[]` on query results |
+| **WT-integration-tests** | I8 remainder | `tests/`, fixtures under `tests/fixtures/` | merge priority, parseResponse fixtures, extract classifyTweet, e2e smoke if cheap |
+
+### Conflict rules (agents)
+
+1. **Never** edit a file outside your "Exclusive own" list.
+2. If you need an API from another area (e.g. `fetchWithRetry`), **import the Wave 0 symbol** after merge -- do not copy-paste retry into graphql/extract/llm.
+3. Public entrypoints stay stable: `runExtract`, `runIndexes`, `runClassify`, `createGraphQL`, `getPipelineDb`, `runMigrate`.
+4. Project rules: no default params, no lint ignore, no `as` without validation, ASCII comments, `deno task ch:all` before handoff.
+5. Classify product rule: per-item failure logs and continues; do **not** make classify fail-fast.
+
+### Suggested jj workspace names
+
+```text
+../ft-pipeline_wt_hygiene
+../ft-pipeline_wt_classify
+../ft-pipeline_wt_db
+../ft-pipeline_wt_migrate
+../ft-pipeline_wt_http
+../ft-pipeline_wt_indexes
+../ft-pipeline_wt_tests_pure
+# after merge wave 0:
+../ft-pipeline_wt_sync
+../ft-pipeline_wt_extract
+../ft-pipeline_wt_llm
+../ft-pipeline_wt_catches
+```
+
+---
+
+## Feature backlog (after immediate)
+
+Design docs under `docs/feature-parity/` and `docs/features/`.
+
+| ID | Feature | Status | Doc |
+| -- | ------- | ------ | --- |
+| F1 | Media download (local files, caps, `FT_MEDIA_DIR`) | Missing | `docs/feature-parity/media-download.md` |
+| F2 | LLM fallback provider chain | Missing | feature-parity index |
+| F3 | Bookmark folders sync/tags | Missing | `docs/feature-parity/bookmark-folders.md` |
+| F4 | Gaps mode / backfill wiring | Missing / partial flags | folders doc |
+| F5 | Index multi-type / multi-domain display | Missing | uses primary_* only today |
+| F6 | Extract: raw xtracticle JSON archive if truncated | Missing | was Step 3 bullet |
+| F7 | Article images as **local** media (not only remote md links) | Partial -- remote links done | B4 + F1 |
+
+**Article images note (verified):** `extractArticleImages` + `buildMediaList` write remote
+markdown images into clippings. Remaining work is local download/reliability (F1/F7), not "totally
+ignored" as old B4 text claimed.
+
+---
+
+## Explicit non-goals / decisions
+
+| Topic | Decision |
+| ----- | -------- |
+| Full pipeline continues when a step fails | **Desired** -- log + hints; do not fail-fast the whole `runFull` by default |
+| Classify single-item failure | **Must not** kill the run; log and count as failed (I0) |
+| Prisma / heavy ORM | **No** -- improve sqlite3 CLI usage (I2) |
+| Vitest | Optional later; Deno.test is enough for now |
+| Dead ft-cli / options tombstones | **Remove** (I1), do not keep "for reference" |
+
+---
+
+## Done (reference only -- details in docs)
+
+Do not re-litigate these in this file:
+
+- Wiki output under `~/StoneVault/wiki/` (bookmarks/categories/domains/entities/index)
+- Own `pipeline.db`, cookies, logs under XDG config
+- Generate without ft-cli; hash-based index writes
+- Time-based log filenames
+- Entity query filters null/empty `author_handle` (`indexes.ts`)
+- B1 merge, B2/B3 classify columns/prompt, B5 indexes columns (see `docs/_fixes/`, `docs/completed/`)
+- CLI schema split: `cli-schema.types.ts` + `cli-schema.tree.ts`
+- Config command + file-backed config
+
+---
+
+## Hard-coded / volatile values (short list)
+
+Full line-number audit was stale; these are the ones that still matter:
+
+| What | Where | Why care |
+| ---- | ----- | -------- |
+| Bookmarks GraphQL query id + feature flags + public bearer | `extraction/graphql.ts` | X rotates these; silent sync emptiness |
+| LLM base URL / model | config / env | Already partly env-driven -- keep it that way |
+| TYPES / DOMAINS taxonomy | `config.ts` | Product change requires code/config edit |
+| Retry/jitter constants | graphql + config | Should converge on I4 + CONFIG |
+| Classify confidence threshold, batch sizes | classify / config | Fine as config knobs |
+
+---
+
+## See also
+
+- `AGENTS.md` -- conventions, pipeline map, taxonomy
+- `docs/index.md` -- docs home
+- `docs/feature-parity/` -- media, folders, etc.
+- `docs/_fixes/` -- historical fix specs (some status text may lag code; trust `src/`)
