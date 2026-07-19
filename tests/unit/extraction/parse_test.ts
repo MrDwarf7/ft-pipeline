@@ -1,14 +1,10 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import { dirname, fromFileUrl, join } from "@std/path";
-import { parseResponse } from "./parse.ts";
-import { BookmarksResponseSchema, TweetDataSchema } from "./schema.ts";
+import { parseResponse } from "../../../src/extraction/parse.ts";
+import { BookmarksResponseSchema, TweetDataSchema } from "../../../src/extraction/schema.ts";
 
-const fixturesDir = join(dirname(fromFileUrl(import.meta.url)), "fixtures");
+import { loadFixture as loadJsonFixture } from "../../fixtures/load.ts";
 
-const loadFixture = async (name: string): Promise<unknown> => {
-  const raw = await Deno.readTextFile(join(fixturesDir, name));
-  return JSON.parse(raw);
-};
+const loadFixture = async (name: string): Promise<unknown> => loadJsonFixture(`graphql/${name}`);
 
 const minimalTweetResult = {
   legacy: {

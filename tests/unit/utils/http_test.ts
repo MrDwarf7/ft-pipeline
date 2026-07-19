@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
-import { fetchWithRetry, parseRetryAfterMs, type RetryPolicy } from "./http.ts";
+import { fetchWithRetry, parseRetryAfterMs, type RetryPolicy } from "../../../src/utils/http.ts";
 
 const sleepNoop = (_ms: number): Promise<void> => Promise.resolve();
 

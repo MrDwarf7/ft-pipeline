@@ -1,13 +1,13 @@
 import { assertEquals } from "@std/assert";
-import { CONFIG } from "../../config.ts";
-import type { XtracticleTweet } from "../../extraction/xtracticle-schema.ts";
+import { CONFIG } from "../../../../src/config.ts";
+import type { XtracticleTweet } from "../../../../src/extraction/xtracticle-schema.ts";
 import {
   classifyTweet,
   extractArticleImages,
   extractArticleText,
   getEffectiveText,
   normalizeMedia,
-} from "./classify.ts";
+} from "../../../../src/commands/extract/classify.ts";
 
 const baseTweet = (overrides: Partial<XtracticleTweet>): XtracticleTweet => ({
   id: "123",

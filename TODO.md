@@ -56,16 +56,8 @@ Details (historical briefs): [`docs/worktrees-immediate.md`](docs/worktrees-imme
 - **Compile startup / size (later perf):** binaries ~90--130MB with Deno runtime inside. Tried
   `deno compile --bundle --minify` (experimental) -- smaller payload but broke with JSON `import` of
   `deno.json` path layout. Revisit when stable; for now `--exclude-unused-npm` only.
-- **Move tests out of `src/`:** ~14 colocated `*_test.ts` under `src/` go under `tests/` --
-  free-form or per-area folders (e.g. `tests/unit/utils/`, `tests/unit/commands/`). Keep
-  `tests/integration/` + `tests/e2e/`. Touch: imports, `deno.json` tasks (`test` / `test:unit`
-  currently scan `src/`), CI, docs. Goal: `src/` is product code only.
-  - Most pure unit files move cleanly (`*_test.ts` that only import symbols).
-  - Sticky bits: `src/extraction/parse_test.ts` + `src/extraction/fixtures/` (paths via
-    `import.meta.url`); move fixtures with the test or point at `tests/fixtures/`.
-  - Config: `config_migrate_test.ts` is pure rename helpers and can move. Full config load (`CONFIG`
-    / file I/O) may need injectable deps first -- if something still insists on living next to
-    `config.ts` for import side-effects, leave that one exception documented.
+- **Move tests out of `src/`:** DONE -- unit tests live under `tests/unit/` (mirrors modules);
+  fixtures under `tests/fixtures/`; `deno.json` tasks scan `tests/` only.
 
 ### Historical task list (I0--I9) -- DONE (audit only)
 

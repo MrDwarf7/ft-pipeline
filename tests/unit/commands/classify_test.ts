@@ -1,6 +1,6 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import { settleClassify } from "./classify.ts";
-import type { ClassifyResult } from "./classify-llm.ts";
+import { settleClassify } from "../../../src/commands/classify.ts";
+import type { ClassifyResult } from "../../../src/commands/classify-llm.ts";
 
 Deno.test("settleClassify returns classified when work succeeds", async () => {
   const result = await settleClassify(

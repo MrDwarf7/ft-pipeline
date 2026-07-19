@@ -1,5 +1,5 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { ALL_OPTIONS } from "../cli-schema.tree.ts";
+import { ALL_OPTIONS } from "../../../src/cli-schema.tree.ts";
 import {
   generateBash,
   generateCompletion,
@@ -8,7 +8,7 @@ import {
   generateZsh,
   isShell,
   SHELLS,
-} from "./completion.ts";
+} from "../../../src/commands/completion.ts";
 
 Deno.test("isShell accepts known shells only", () => {
   assertEquals(isShell("bash"), true);

@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { parseDate } from "./datetime.ts";
+import { parseDate } from "../../../src/utils/datetime.ts";
 
 const EPOCH_PARTS = {
   year: "1970",

@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { ALL_OPTIONS, findHelpScreen, getParseArgsConfig } from "./cli-schema.tree.ts";
+import { ALL_OPTIONS, findHelpScreen, getParseArgsConfig } from "../../src/cli-schema.tree.ts";
 
 Deno.test("top-level help lists core commands", () => {
   const help = findHelpScreen(["--help"]) ?? "";

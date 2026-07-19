@@ -1,6 +1,6 @@
 /** Unit tests for pure config key renames (maxRetries -> maxExternalCallAttempts). */
 import { assertEquals } from "@std/assert";
-import { applyConfigKeyRenames, CONFIG_KEY_RENAMES } from "./config.ts";
+import { applyConfigKeyRenames, CONFIG_KEY_RENAMES } from "../../src/config.ts";
 
 Deno.test("applyConfigKeyRenames rewrites maxRetries to maxExternalCallAttempts", () => {
   const { next, applied } = applyConfigKeyRenames(

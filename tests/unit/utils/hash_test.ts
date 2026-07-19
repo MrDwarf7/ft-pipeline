@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { hashContent, hashesMatch, needsUpdate } from "./hash.ts";
+import { hashContent, hashesMatch, needsUpdate } from "../../../src/utils/hash.ts";
 
 Deno.test("hashContent is stable for same input", async () => {
   const a = await hashContent("hello");

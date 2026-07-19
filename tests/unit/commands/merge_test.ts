@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { clippingTypeRank, shouldPreferClipping } from "./merge.ts";
+import { clippingTypeRank, shouldPreferClipping } from "../../../src/commands/merge.ts";
 
 Deno.test("clippingTypeRank: article > post > media", () => {
   assertEquals(clippingTypeRank("article") > clippingTypeRank("post"), true);

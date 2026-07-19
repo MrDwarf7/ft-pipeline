@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { extractBody, parseFrontmatter } from "./frontmatter.ts";
+import { extractBody, parseFrontmatter } from "../../../src/utils/frontmatter.ts";
 
 Deno.test("parseFrontmatter reads tweet_id and quoted values", () => {
   const md = `---

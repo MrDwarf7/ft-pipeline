@@ -4,7 +4,7 @@ import {
   ChatCompletionSchema,
   modelIdsFromResponse,
   ModelsResponseSchema,
-} from "./schema.ts";
+} from "../../../src/llm/schema.ts";
 
 Deno.test("ModelsResponseSchema accepts OpenAI data array", () => {
   const parsed = ModelsResponseSchema.parse({

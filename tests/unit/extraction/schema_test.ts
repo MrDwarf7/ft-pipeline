@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { TweetDataSchema } from "./schema.ts";
+import { TweetDataSchema } from "../../../src/extraction/schema.ts";
 
 const minimalTweet = {
   tweet: {

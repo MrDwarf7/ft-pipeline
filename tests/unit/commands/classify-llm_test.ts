@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import { parseLLMResponse } from "./classify-llm.ts";
+import { parseLLMResponse } from "../../../src/commands/classify-llm.ts";
 
 Deno.test("parseLLMResponse parses valid JSON object", () => {
   const raw =

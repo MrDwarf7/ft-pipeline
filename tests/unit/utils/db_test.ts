@@ -1,6 +1,6 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import { openDatabase } from "./db.ts";
-import type { Database } from "./db.ts";
+import { openDatabase } from "../../../src/utils/db.ts";
+import type { Database } from "../../../src/utils/db.ts";
 
 const schema = `
 CREATE TABLE bookmarks (

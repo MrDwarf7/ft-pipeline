@@ -1,21 +1,11 @@
 /** Fixture-driven integration coverage for GraphQL parseResponse. */
 
 import { assertEquals, assertThrows } from "@std/assert";
-import { dirname, fromFileUrl, join } from "@std/path";
 import { parseResponse } from "../../src/extraction/parse.ts";
 import { loadFixture } from "../fixtures/load.ts";
 
-const extractionFixture = async (name: string): Promise<unknown> => {
-  const dir = join(
-    dirname(fromFileUrl(import.meta.url)),
-    "../../src/extraction/fixtures",
-  );
-  const raw = await Deno.readTextFile(join(dir, name));
-  return JSON.parse(raw);
-};
-
 Deno.test("integration: parseResponse bookmarks-page-ok (shared extraction fixture)", async () => {
-  const page = parseResponse(await extractionFixture("bookmarks-page-ok.json"));
+  const page = parseResponse(await loadFixture("graphql/bookmarks-page-ok.json"));
   assertEquals(page.records.length, 1);
   assertEquals(page.records[0]?.id, "2039805659525644595");
   assertEquals(page.records[0]?.author.screen_name, "karpathy");
