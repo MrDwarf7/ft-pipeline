@@ -127,6 +127,7 @@ export const classifyWithLLM = async (
     ],
     temperature: 0.1,
     maxTokens: 500,
+    jsonMode: "json_object",
     jsonSchema: CLASSIFY_SCHEMA,
   });
   return parseLLMResponse(text);

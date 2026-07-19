@@ -5,11 +5,21 @@ export interface LLMMessage {
   content: string;
 }
 
+/** How the provider should request JSON when `jsonSchema` is set. */
+export type LLMJsonMode = "json_object" | "schema" | "prompt";
+
 export interface LLMChatOptions {
   messages: LLMMessage[];
-  temperature?: number;
-  maxTokens?: number;
-  /** Request structured JSON output. The provider decides HOW to enforce this. */
+  /** Sampling temperature -- caller always supplies (no client default). */
+  temperature: number;
+  /** Max completion tokens -- caller always supplies (no client default). */
+  maxTokens: number;
+  /**
+   * How to request structured JSON when `jsonSchema` is present. Required on
+   * every call so openai-compat never invents a mode.
+   */
+  jsonMode: LLMJsonMode;
+  /** Request structured JSON output. The provider decides HOW via jsonMode. */
   jsonSchema?: Record<string, unknown>;
 }
 
@@ -32,3 +42,9 @@ export interface LLMProvider {
 }
 
 export { createOpenAICompat } from "./openai-compat.ts";
+export {
+  assistantTextFromCompletion,
+  ChatCompletionSchema,
+  modelIdsFromResponse,
+  ModelsResponseSchema,
+} from "./schema.ts";
