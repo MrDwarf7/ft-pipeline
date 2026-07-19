@@ -2,6 +2,7 @@
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
+import { GenerateBookmarkRowSchema, parseRows } from "../utils/db-rows.ts";
 import { parseDate } from "../utils/datetime.ts";
 
 interface BookmarkData {
@@ -107,8 +108,10 @@ const buildFilename = (b: BookmarkData): string => {
 
 const fetchAllBookmarks = (): BookmarkData[] => {
   const db = getPipelineDb();
-  const rows = db
-    .prepare(`
+  const rows = parseRows(
+    GenerateBookmarkRowSchema,
+    db
+      .prepare(`
     SELECT
       tweet_id,
       url,
@@ -127,23 +130,24 @@ const fetchAllBookmarks = (): BookmarkData[] => {
     FROM bookmarks
     ORDER BY posted_at DESC
   `)
-    .all<Record<string, unknown>>();
+      .all(),
+  );
 
   return rows.map((r) => ({
-    tweet_id: r.tweet_id as string,
-    url: r.url as string,
-    text: r.text as string,
-    display_text: r.display_text as string,
-    author_handle: r.author_handle as string,
-    author_name: r.author_name as string,
-    posted_at: r.posted_at as string,
-    primary_type: r.primary_type as string,
-    primary_domain: r.primary_domain as string,
-    types: safeJsonArr(r.types_raw as string | null),
-    domains: safeJsonArr(r.domains_raw as string | null),
-    confidence: r.confidence as number | null,
-    content_type: r.content_type as string,
-    media_count: r.media_count as number,
+    tweet_id: r.tweet_id,
+    url: r.url,
+    text: r.text,
+    display_text: r.display_text,
+    author_handle: r.author_handle,
+    author_name: r.author_name,
+    posted_at: r.posted_at,
+    primary_type: r.primary_type,
+    primary_domain: r.primary_domain,
+    types: safeJsonArr(r.types_raw),
+    domains: safeJsonArr(r.domains_raw),
+    confidence: r.confidence,
+    content_type: r.content_type,
+    media_count: r.media_count,
   }));
 };
 

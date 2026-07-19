@@ -2,6 +2,7 @@
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, getPipelineDb } from "../utils/db.ts";
+import { CountRowSchema, parseRows, TweetIdRowSchema } from "../utils/db-rows.ts";
 import { extractBody, parseFrontmatter } from "../utils/frontmatter.ts";
 
 interface MergeOptions {
@@ -106,12 +107,13 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
   const db = getPipelineDb();
 
   try {
-    // Find which tweet_ids exist in the DB
+    /* Equality-only select for membership. Conditional merge update stays on
+     * prepare: helper update always SETs and would overwrite non-null text. */
     const dbIds = new Set(
-      db
-        .prepare("SELECT tweet_id FROM bookmarks")
-        .all<{ tweet_id: string }>()
-        .map((r) => r.tweet_id),
+      parseRows(
+        TweetIdRowSchema,
+        db.select("bookmarks", { columns: ["tweet_id"] }),
+      ).map((r) => r.tweet_id),
     );
 
     let merged = 0;
@@ -127,12 +129,10 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
         AND (clippings_text IS NULL OR clippings_merged_at IS NULL)
     `);
 
-    // Process clippings functionally - filter and map operations
     const validClippings = Array.from(clippings.entries()).filter(([tweetId]) =>
       dbIds.has(tweetId)
     );
 
-    // Sequentially update each matching clipping
     const updatePromises = validClippings.map(([tweetId, entry]) => {
       stmt.run(entry.body, entry.type, now, tweetId);
       merged++;
@@ -143,14 +143,17 @@ export const runMerge = async (options: MergeOptions = {}): Promise<void> => {
 
     logger.info("merge complete", { merged, skipped, total: clippings.size });
 
-    // Log enrichment stats
-    const enrichedCount = db
-      .prepare(
-        "SELECT COUNT(*) as cnt FROM bookmarks WHERE clippings_text IS NOT NULL",
-      )
-      .all<{ cnt: number }>();
+    const enrichedRows = parseRows(
+      CountRowSchema,
+      db
+        .prepare(
+          "SELECT COUNT(*) as cnt FROM bookmarks WHERE clippings_text IS NOT NULL",
+        )
+        .all(),
+    );
+    const enrichedFirst = enrichedRows[0];
     logger.info("DB enrichment status", {
-      totalEnriched: enrichedCount?.[0]?.cnt ?? 0,
+      totalEnriched: enrichedFirst === undefined ? 0 : enrichedFirst.cnt,
     });
   } finally {
     closePipelineDb();

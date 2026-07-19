@@ -1,6 +1,7 @@
 /** DB query and status updates for extract. */
 
 import type { Database } from "../../utils/db.ts";
+import { ExtractPendingRowSchema, parseRows } from "../../utils/db-rows.ts";
 import type { BookmarkRow } from "./types.ts";
 
 /** Bookmarks still needing extraction (null path / error status + links or media). */
@@ -8,9 +9,7 @@ export const queryPendingRows = (
   db: Database,
   limit: number | undefined,
 ): BookmarkRow[] => {
-  const limitSql = typeof limit === "number" ? `LIMIT ${limit}` : "";
-  return db
-    .prepare(`
+  const baseSql = `
     SELECT tweet_id, url, text, author_handle, links_json, media_count
     FROM bookmarks
     WHERE (clipping_path IS NULL OR clipping_path = '')
@@ -18,9 +17,11 @@ export const queryPendingRows = (
       AND (links_json IS NOT NULL AND links_json != '[]'
            OR COALESCE(media_count, 0) > 0)
     ORDER BY posted_at DESC
-    ${limitSql}
-  `)
-    .all<BookmarkRow>();
+  `;
+  const raw = limit === undefined
+    ? db.prepare(baseSql).all()
+    : db.prepare(`${baseSql} LIMIT ?`).all(limit);
+  return parseRows(ExtractPendingRowSchema, raw);
 };
 
 /** Mark bookmark as extracted with clipping path. */

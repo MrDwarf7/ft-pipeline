@@ -4,6 +4,7 @@
 import { checkCookies, getCookies } from "./cookies.ts";
 import { logger } from "../utils/logger.ts";
 import { getPipelineDb } from "../utils/db.ts";
+import { parseRows, TweetIdRowSchema } from "../utils/db-rows.ts";
 import { createGraphQL } from "../extraction/index.ts";
 import type { TweetData } from "../extraction/types.ts";
 
@@ -22,36 +23,28 @@ const importIntoTipelineDb = (
   tweets: TweetData[],
 ): { imported: number; updated: number } => {
   const db = getPipelineDb();
-
-  const stmt = db.prepare(`
-    INSERT INTO bookmarks (tweet_id, url, text, author_handle, author_name, posted_at, links_json, media_count, synced_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(tweet_id) DO UPDATE SET
-      text = excluded.text,
-      author_handle = excluded.author_handle,
-      author_name = excluded.author_name,
-      posted_at = excluded.posted_at,
-      links_json = excluded.links_json,
-      media_count = excluded.media_count,
-      synced_at = excluded.synced_at
-  `);
-
   const now = new Date().toISOString();
   let imported = 0;
 
-  tweets.forEach((tweet) => {
-    stmt.run(
-      tweet.id,
-      `https://x.com/${tweet.author.screen_name}/status/${tweet.id}`,
-      tweet.text,
-      tweet.author.screen_name,
-      tweet.author.name,
-      tweet.created_at,
-      tweet.links_json ?? null,
-      tweet.media?.all?.length ?? 0,
-      now,
-    );
-    imported++;
+  db.transaction((tx) => {
+    tweets.forEach((tweet) => {
+      tx.upsert(
+        "bookmarks",
+        {
+          tweet_id: tweet.id,
+          url: `https://x.com/${tweet.author.screen_name}/status/${tweet.id}`,
+          text: tweet.text,
+          author_handle: tweet.author.screen_name,
+          author_name: tweet.author.name,
+          posted_at: tweet.created_at,
+          links_json: tweet.links_json ?? null,
+          media_count: tweet.media?.all?.length ?? 0,
+          synced_at: now,
+        },
+        ["tweet_id"],
+      );
+      imported++;
+    });
   });
 
   return { imported, updated: 0 };
@@ -60,10 +53,10 @@ const importIntoTipelineDb = (
 /** Load all existing tweet_ids from pipeline.db. */
 const getExistingIds = (): Set<string> => {
   const db = getPipelineDb();
-
-  const rows = db.prepare("SELECT tweet_id FROM bookmarks").all<{
-    tweet_id: string;
-  }>();
+  const rows = parseRows(
+    TweetIdRowSchema,
+    db.select("bookmarks", { columns: ["tweet_id"] }),
+  );
   return new Set(rows.map((r) => r.tweet_id));
 };
 

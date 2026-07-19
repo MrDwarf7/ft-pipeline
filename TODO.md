@@ -9,19 +9,19 @@ Verified against `src/` on **2026-07-20**. Historical "we did X on date Y" write
 
 ## Current pipeline status (code reality)
 
-| Step     | Status | Notes |
-| -------- | ------ | ----- |
-| Sync     | OK     | GraphQL + `fetchWithRetry`; envelope Zod; parse split; drop counts / drift hard-fail. |
-| Extract  | OK     | xtracticle Zod + retry; module split; remote article images in clippings. |
-| Merge    | OK     | Clippings -> `clippings_text`; singular/plural type rank fixed. |
-| Classify | OK     | Per-item settle path; LLM retry + response Zod; empty content throws item-level. |
-| Generate | OK     | Template render from `pipeline.db`. |
+| Step     | Status | Notes                                                                                    |
+| -------- | ------ | ---------------------------------------------------------------------------------------- |
+| Sync     | OK     | GraphQL + `fetchWithRetry`; envelope Zod; parse split; drop counts / drift hard-fail.    |
+| Extract  | OK     | xtracticle Zod + retry; module split; remote article images in clippings.                |
+| Merge    | OK     | Clippings -> `clippings_text`; singular/plural type rank fixed.                          |
+| Classify | OK     | Per-item settle path; LLM retry + response Zod; empty content throws item-level.         |
+| Generate | OK     | Template render from `pipeline.db`.                                                      |
 | Indexes  | OK     | Split query/view/render/write; hash caching; primary_* only (multi-label still backlog). |
 
-**Config:** file + env + zod (`config` command). Fail-loud on invalid file; NotFound -> defaults.  
+**Config:** file + env + zod (`config` command). Fail-loud on invalid file; NotFound -> defaults.\
 **DB:** sqlite3 CLI runner + `insert`/`upsert`/`update`/`select`/`transaction` (call sites still
-mostly `prepare` -- Wave 2).  
-**Tests:** `deno task test:unit` -- 92 passed after immediate merge.  
+mostly `prepare` -- Wave 2).\
+**Tests:** `deno task test:unit` -- 92 passed after immediate merge.\
 **Dead files:** removed (`options.ts`, `ft-cli.ts`).
 
 

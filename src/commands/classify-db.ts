@@ -3,26 +3,28 @@
  */
 
 import { type Database } from "../utils/db.ts";
+import {
+  type ClassifyUnclassifiedRow,
+  ClassifyUnclassifiedRowSchema,
+  parseRows,
+} from "../utils/db-rows.ts";
 import { logger } from "../utils/logger.ts";
 import { type ClassificationResult } from "./classify-llm.ts";
 
-export interface Row {
-  tweet_id: string;
-  text: string;
-  author_handle: string;
-  clippings_text: string | null;
-}
+export type Row = ClassifyUnclassifiedRow;
 
-export const queryUnclassified = (db: Database, limit?: number): Row[] =>
-  db
-    .prepare(`
+export const queryUnclassified = (db: Database, limit?: number): Row[] => {
+  const baseSql = `
     SELECT tweet_id, text, author_handle, clippings_text
     FROM bookmarks
     WHERE primary_type IS NULL
     ORDER BY posted_at DESC
-    ${limit ? `LIMIT ${limit}` : ""}
-  `)
-    .all<Row>();
+  `;
+  const raw = limit === undefined
+    ? db.prepare(baseSql).all()
+    : db.prepare(`${baseSql} LIMIT ?`).all(limit);
+  return parseRows(ClassifyUnclassifiedRowSchema, raw);
+};
 
 export const dryRunPreview = (rows: Row[]) => {
   logger.info("dry run -- showing first 5 unclassified bookmarks", {
@@ -37,23 +39,17 @@ export const dryRunPreview = (rows: Row[]) => {
 
 export const markShortTweet = (db: Database, tweetId: string) => {
   const now = new Date().toISOString();
-  db.prepare(`
-    UPDATE bookmarks SET
-      types = ?,
-      primary_type = ?,
-      domains = ?,
-      primary_domain = ?,
-      classified_at = ?,
-      confidence = ?
-    WHERE tweet_id = ?
-  `).run(
-    '["meme-shitpost"]',
-    "meme-shitpost",
-    '["culture"]',
-    "culture",
-    now,
-    0.1,
-    tweetId,
+  db.update(
+    "bookmarks",
+    {
+      types: '["meme-shitpost"]',
+      primary_type: "meme-shitpost",
+      domains: '["culture"]',
+      primary_domain: "culture",
+      classified_at: now,
+      confidence: 0.1,
+    },
+    { tweet_id: tweetId },
   );
 };
 
@@ -63,22 +59,16 @@ export const saveClassification = (
   result: ClassificationResult,
 ) => {
   const now = new Date().toISOString();
-  db.prepare(`
-    UPDATE bookmarks SET
-      types = ?,
-      primary_type = ?,
-      domains = ?,
-      primary_domain = ?,
-      classified_at = ?,
-      confidence = ?
-    WHERE tweet_id = ?
-  `).run(
-    JSON.stringify(result.types),
-    result.primary_type,
-    JSON.stringify(result.domains),
-    result.primary_domain,
-    now,
-    result.confidence,
-    tweetId,
+  db.update(
+    "bookmarks",
+    {
+      types: JSON.stringify(result.types),
+      primary_type: result.primary_type,
+      domains: JSON.stringify(result.domains),
+      primary_domain: result.primary_domain,
+      classified_at: now,
+      confidence: result.confidence,
+    },
+    { tweet_id: tweetId },
   );
 };

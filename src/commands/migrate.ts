@@ -4,6 +4,7 @@
 import { CONFIG } from "../config.ts";
 import { logger } from "../utils/logger.ts";
 import { closePipelineDb, type Database, getPipelineDb } from "../utils/db.ts";
+import { NameRowSchema, parseRows } from "../utils/db-rows.ts";
 
 /** Full bookmarks schema for fresh DBs. Existing tables are left intact. */
 const BOOKMARKS_DDL = `
@@ -59,25 +60,19 @@ interface Migration {
 
 /** Column names currently on bookmarks (empty when the table does not exist). */
 const readBookmarkColumns = (db: Database): ReadonlySet<string> => {
-  const names = db
-    .prepare("PRAGMA table_info(bookmarks)")
-    .all()
-    .flatMap((row) => {
-      const name = row["name"];
-      return typeof name === "string" ? [name] : [];
-    });
+  const names = parseRows(
+    NameRowSchema,
+    db.prepare("PRAGMA table_info(bookmarks)").all(),
+  ).map((row) => row.name);
   return new Set(names);
 };
 
 /** Names already recorded in the migration ledger. */
 const readAppliedMigrations = (db: Database): ReadonlySet<string> => {
-  const names = db
-    .prepare("SELECT name FROM migration_runs")
-    .all()
-    .flatMap((row) => {
-      const name = row["name"];
-      return typeof name === "string" ? [name] : [];
-    });
+  const names = parseRows(
+    NameRowSchema,
+    db.prepare("SELECT name FROM migration_runs").all(),
+  ).map((row) => row.name);
   return new Set(names);
 };
 
@@ -86,10 +81,10 @@ const recordMigration = (
   name: string,
   stats: Record<string, unknown>,
 ): void => {
-  db.prepare("INSERT INTO migration_runs (name, stats) VALUES (?, ?)").run(
+  db.insert("migration_runs", {
     name,
-    JSON.stringify(stats),
-  );
+    stats: JSON.stringify(stats),
+  });
 };
 
 /** Add a column only when PRAGMA shows it is missing. */
