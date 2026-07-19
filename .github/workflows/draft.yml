@@ -1,31 +1,39 @@
-name: "Draft"
+name: Draft
 
 on:
   push:
     branches:
-      - master
       - main
-    tags: ["v[0-9]+.[0-9]+.[0-9]??"]
+    tags:
+      - "v*"
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: draft-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
-  LICENSE_FILE_REG: LICENS*|LICENSE-*|LICENSE-MIT|LICENSE-APACHE
-  LICENSE_FILES_WINDOWS: LICENSE*
-  GITHUB_BRANCH_TAG_NAME: ${{ github.ref_name }}
   PROJECT_NAME: ft-pipeline
 
 jobs:
-  build-unix:
-    name: "Draft - build-unix"
+  build:
+    name: build-${{ matrix.target }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            bin_name: ft-pipeline
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin_name: ft-pipeline.exe
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            bin_name: ft-pipeline
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            bin_name: ft-pipeline
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -34,80 +42,74 @@ jobs:
         with:
           install-sqlite: "false"
 
-      - name: Build
+      - name: Compile
         shell: bash
         run: |
           set -euo pipefail
-          ARTIFACT_NAME="${{ env.PROJECT_NAME }}-${{ matrix.target }}-${{ env.GITHUB_BRANCH_TAG_NAME }}"
-          deno compile --allow-all -o "dist/${{ env.PROJECT_NAME }}" src/main.ts
+          mkdir -p dist
+          deno compile \
+            --allow-read \
+            --allow-write \
+            --allow-env \
+            --allow-sys=homedir \
+            --allow-run=sqlite3 \
+            --allow-net \
+            --exclude-unused-npm \
+            --target "${{ matrix.target }}" \
+            -o "dist/${{ env.PROJECT_NAME }}" \
+            src/main.ts
+          if [[ ! -f "dist/${{ matrix.bin_name }}" ]]; then
+            if [[ -f "dist/${{ env.PROJECT_NAME }}" ]]; then
+              mv "dist/${{ env.PROJECT_NAME }}" "dist/${{ matrix.bin_name }}"
+            else
+              ls -la dist/
+              exit 1
+            fi
+          fi
+
+      - name: Ensure zip (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v zip >/dev/null 2>&1; then
+            choco install zip -y --no-progress
+          fi
+          zip --version | head -1
+
+      - name: Pack artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARTIFACT_NAME="${{ env.PROJECT_NAME }}-${{ matrix.target }}-${{ github.ref_name }}"
           mkdir -p "${ARTIFACT_NAME}"
-          cp "dist/${{ env.PROJECT_NAME }}" "${ARTIFACT_NAME}/"
+          cp "dist/${{ matrix.bin_name }}" "${ARTIFACT_NAME}/"
           cp README.md "${ARTIFACT_NAME}/" 2>/dev/null || true
-          # Optional license files at repo root
-          find . -maxdepth 1 -type f \( -name 'LICENSE*' -o -name 'LICENCE*' \) -exec cp {} "${ARTIFACT_NAME}/" \; || true
+          find . -maxdepth 1 -type f \( -name 'LICENSE*' -o -name 'LICENCE*' \) \
+            -exec cp {} "${ARTIFACT_NAME}/" \; || true
+          # Zip *contents* of the staging dir (cd + zip .), not the dir itself.
+          # Users should get: zip -> files. Not: zip -> ARTIFACT_NAME/ -> files.
           (cd "${ARTIFACT_NAME}" && zip -r "../${ARTIFACT_NAME}.zip" .)
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.PROJECT_NAME }}-${{ matrix.target }}-${{ env.GITHUB_BRANCH_TAG_NAME }}
-          path: ${{ env.PROJECT_NAME }}-${{ matrix.target }}-${{ env.GITHUB_BRANCH_TAG_NAME }}.zip
-          if-no-files-found: error
-          compression-level: 9
-
-  build-windows:
-    name: "Draft - build-windows"
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-deno
-        with:
-          install-sqlite: "false"
-
-      - name: Build
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $ARTIFACT_NAME = "${{ env.PROJECT_NAME }}-${{ matrix.target }}-${{ env.GITHUB_BRANCH_TAG_NAME }}"
-          deno compile --allow-all -o "dist/${{ env.PROJECT_NAME }}" src/main.ts
-          New-Item -ItemType Directory -Force -Path $ARTIFACT_NAME | Out-Null
-          Copy-Item -Path "dist/${{ env.PROJECT_NAME }}.exe" -Destination $ARTIFACT_NAME -ErrorAction SilentlyContinue
-          if (-not (Test-Path "$ARTIFACT_NAME/${{ env.PROJECT_NAME }}.exe")) {
-            # deno may emit without .exe suffix depending on version
-            Copy-Item -Path "dist/${{ env.PROJECT_NAME }}" -Destination "$ARTIFACT_NAME/${{ env.PROJECT_NAME }}.exe"
-          }
-          if (Test-Path "README.md") { Copy-Item "README.md" $ARTIFACT_NAME }
-          Get-ChildItem -Path . -Filter "LICENSE*" -File -ErrorAction SilentlyContinue |
-            ForEach-Object { Copy-Item $_.FullName $ARTIFACT_NAME }
-          Compress-Archive -Path "$ARTIFACT_NAME\*" -DestinationPath "$ARTIFACT_NAME.zip" -Force
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.PROJECT_NAME }}-${{ matrix.target }}-${{ env.GITHUB_BRANCH_TAG_NAME }}
-          path: ${{ env.PROJECT_NAME }}-${{ matrix.target }}-${{ env.GITHUB_BRANCH_TAG_NAME }}.zip
+          name: ${{ env.PROJECT_NAME }}-${{ matrix.target }}-${{ github.ref_name }}
+          path: ${{ env.PROJECT_NAME }}-${{ matrix.target }}-${{ github.ref_name }}.zip
           if-no-files-found: error
           compression-level: 9
 
   draft:
-    name: "Draft - draft"
-    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    name: draft-release
+    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
     runs-on: ubuntu-latest
-    needs: [build-unix, build-windows]
+    needs: [build]
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
 
@@ -116,40 +118,41 @@ jobs:
         with:
           fail_on_unmatched_files: true
           draft: true
-          files: |
-            ${{ env.PROJECT_NAME }}-*
+          files: ${{ env.PROJECT_NAME }}-*
           generate_release_notes: true
 
   nightly:
-    name: "Draft - nightly"
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    name: nightly-release
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: write
     runs-on: ubuntu-latest
-    needs: [build-unix, build-windows]
+    needs: [build]
     steps:
-      - name: Generate nightly body
+      - name: Nightly body
         run: |
           {
             echo 'NIGHTLY_BODY<<EOF'
             echo "From commit: ${GITHUB_SHA:0:8}"
             echo "Generated on: $(date -u +"%Y-%m-%d %H:%M") UTC"
+            echo "Platforms: linux-x64, windows-x64, macos-arm64, macos-x64"
+            echo "Compile: least-privilege (read/write/env/sys=homedir/run=sqlite3/net)."
+            echo "Host still needs sqlite3 on PATH (DB is CLI-backed, not embedded)."
             echo "EOF"
           } >> "$GITHUB_ENV"
 
-      - name: Checkout sources
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
 
-      - name: Update the nightly tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag --force nightly && git push --force origin tag nightly
+      # API only (default GITHUB_TOKEN). Avoid git force-push of tags: that can fail when
+      # the commit tree includes .github/workflows changes.
+      - name: Drop previous nightly release + tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
 
       - name: Release Nightly
         uses: softprops/action-gh-release@v2
@@ -157,8 +160,7 @@ jobs:
           tag_name: nightly
           prerelease: true
           fail_on_unmatched_files: true
-          files: |
-            ${{ env.PROJECT_NAME }}-*
+          files: ${{ env.PROJECT_NAME }}-*
           name: Nightly Build
           body: ${{ env.NIGHTLY_BODY }}
           target_commitish: ${{ github.sha }}

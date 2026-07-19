@@ -35,16 +35,16 @@ If someone sent you this README (or the repo link) and wants the pipeline runnin
 Minimal "get them unblocked" path once Deno + `sqlite3` exist:
 
 ```bash
-deno run --allow-all src/main.ts migrate
-deno run --allow-all src/main.ts cookies extract   # interactive, once
+deno task start migrate
+deno task start cookies extract   # interactive, once
 export FT_COOKIES_PATH="$HOME/.config/ft-pipeline/.sync-cookies.enc"
 export FT_PIPELINE_PASSWORD="..."                  # ask the human
-deno run --allow-all src/main.ts full --password "$FT_PIPELINE_PASSWORD"
+deno task start full --password "$FT_PIPELINE_PASSWORD"
 ```
 
-Prefer `./dist/ft-pipeline` after `deno task build` for cron. There is no `deno task sync` /
-`deno task full` -- use the binary or `deno run`. Soft failures inside `full` (e.g. classify with no
-LLM) are logged; remaining steps still run.
+Prefer `./dist/ft-pipeline` after `deno task build` for cron. Release builds use least-privilege
+flags (not `--allow-all`); host still needs `sqlite3` on PATH. Soft failures inside `full` (e.g.
+classify with no LLM) are logged; remaining steps still run.
 
 Humans who are not using an agent: skip this section and keep reading.
 
@@ -78,45 +78,79 @@ security, …). Skip classify if you only want text and files.
 
 ### What you need
 
-| Need                                     | Why                                            |
-| ---------------------------------------- | ---------------------------------------------- |
-| [Deno](https://deno.land/) 2.x           | Runs the CLI                                   |
-| `sqlite3` on PATH                        | Database                                       |
-| X session cookies                        | Only for sync / full                           |
-| Local OpenAI-compatible LLM on port 1234 | Only for classify (or full when classify runs) |
-| Network to xtracticle.com                | Extract                                        |
+| Need                                     | Why                                             |
+| ---------------------------------------- | ----------------------------------------------- |
+| [Deno](https://deno.land/) 2.x           | Runs the CLI (or use a prebuilt binary)         |
+| `sqlite3` on PATH                        | Database -- required even for compiled binaries |
+| X session cookies                        | Only for sync / full                            |
+| Local OpenAI-compatible LLM on port 1234 | Only for classify (or full when classify runs)  |
+| Network to xtracticle.com                | Extract                                         |
 
 Defaults live under `~/.config/ft-pipeline/` (DB, logs, encrypted cookies, config). Vault paths
 (Clippings + wiki) come from config; stock defaults point at `~/StoneVault/…` if you use that
 layout.
+
+### Install `sqlite3` (required)
+
+The pipeline talks to SQLite through the **system `sqlite3` CLI**, not an embedded engine. A
+`deno compile` binary still shells out to `sqlite3`, so the host must provide it.
+
+Check:
+
+```bash
+sqlite3 --version
+```
+
+| OS                   | Install                           |
+| -------------------- | --------------------------------- |
+| Debian / Ubuntu      | `sudo apt-get install -y sqlite3` |
+| Fedora               | `sudo dnf install sqlite`         |
+| Arch                 | `sudo pacman -S sqlite`           |
+| macOS (Homebrew)     | `brew install sqlite`             |
+| Windows (winget)     | `winget install SQLite.SQLite`    |
+| Windows (Chocolatey) | `choco install sqlite`            |
+| Windows (Scoop)      | `scoop install sqlite`            |
+
+After install, open a **new** terminal so `PATH` updates, then re-run `sqlite3 --version`. On
+Windows the binary may be `sqlite3.exe`; that still counts as `sqlite3` on PATH for our
+`--allow-run=sqlite3` compile flag.
 
 ### First run (copy-paste)
 
 ```bash
 git clone <this-repo> && cd ft-pipeline
 
-# schema
-deno run --allow-all src/main.ts migrate
+# schema (tasks use least-privilege flags, not --allow-all)
+deno task start migrate
 
 # one-time: encrypt browser cookies for X
-deno run --allow-all src/main.ts cookies extract
+deno task start cookies extract
 
 export FT_COOKIES_PATH="$HOME/.config/ft-pipeline/.sync-cookies.enc"
 export FT_PIPELINE_PASSWORD="your-password"
 
 # optional: write an editable config file
-deno run --allow-all src/main.ts config init
+deno task start config init
 
 # whole pipeline
-deno run --allow-all src/main.ts full --password "$FT_PIPELINE_PASSWORD"
+deno task start full --password "$FT_PIPELINE_PASSWORD"
 ```
 
-Prefer a binary (cron-friendly):
+Prefer a binary (cron-friendly). Still needs system `sqlite3` on PATH:
 
 ```bash
 deno task build
 ./dist/ft-pipeline migrate
 ./dist/ft-pipeline full --password "$FT_PIPELINE_PASSWORD"
+```
+
+Cross-compile (also used by CI release matrix):
+
+```bash
+deno task build:linux      # x86_64-unknown-linux-gnu
+deno task build:windows    # x86_64-pc-windows-msvc
+deno task build:macos-arm  # aarch64-apple-darwin
+deno task build:macos-x64  # x86_64-apple-darwin
 ```
 
 ### Day-to-day
@@ -155,12 +189,13 @@ it work" checklist. Packaging: [`.agents/README.md`](./.agents/README.md).
 ### Invocation
 
 ```bash
-deno run --allow-all src/main.ts <command> [options]
+deno task start <command> [options]
 # or
 ./dist/ft-pipeline <command> [options]
 ```
 
-`deno task start` is the same as `deno run --allow-all src/main.ts`.
+`deno task start` is least-privilege `deno run` (read/write/env/sys=homedir/run=sqlite3/net). Tests
+still use `--allow-all`.
 
 ### Commands
 
@@ -282,15 +317,16 @@ LLM_PORT=1234 \
 ### Deno tasks (dev)
 
 ```bash
-deno task start          # CLI entry
-deno task build          # compile -> dist/ft-pipeline
+deno task start          # CLI entry (least-privilege)
+deno task build          # compile host binary -> dist/ft-pipeline
+deno task build:linux    # also: build:windows, build:macos-arm, build:macos-x64
 deno task test:unit
 deno task test:e2e
 deno task ch:all         # fmt + check + lint (required after code changes)
 ```
 
 There is no `deno task migrate` / `deno task sync` shortcut for production commands. Use the binary
-or `deno run --allow-all src/main.ts <command>`.
+or `deno task start <command>`.
 
 ### Layout
 
@@ -305,7 +341,7 @@ src/utils/                  db, pipeline, http retry, logging, …
 scripts/run-with-llm.sh     Cron-friendly LLM lifecycle wrapper
 .agents/.master/skills/     Canonical agent skill pack
 .agents/{grok,claude,...}/  Symlinks to master (tool packaging)
-.grok/skills, .claude/skills  Discovery shims -> master
+.claude, .grok              Root shims -> .agents/{claude,grok}
 ```
 
 ### Inspiration

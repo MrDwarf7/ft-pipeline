@@ -1,10 +1,11 @@
-#!/usr/bin/env -S deno run --allow-all
+#!/usr/bin/env -S deno run --allow-read --allow-write --allow-env --allow-sys=homedir --allow-run=sqlite3 --allow-net
 
 /**
  * ft-pipeline -- Bookmark sync, extract, classify, generate pipeline
  *
  * Usage:
- *   deno run --allow-all main.ts <command> [options]
+ *   deno task start <command> [options]
+ *   deno run (least-privilege flags) src/main.ts <command> [options]
  */
 import { assertEnvVars } from "./utils/env.ts";
 import { Command, parseCliArgs } from "./types.ts";

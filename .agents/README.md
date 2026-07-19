@@ -1,7 +1,7 @@
 # Agent skills packaging
 
-Canonical skill content lives in **`.master/`**. Agent folders and tool-native paths are mostly
-symlinks so we edit once.
+Canonical skill content lives in **`.master/`**. Per-agent dirs under `.agents/` are mostly symlinks
+so we edit once.
 
 ```
 .agents/
@@ -11,12 +11,14 @@ symlinks so we edit once.
     skills/                        # -> ../.master/skills
 ```
 
-Repo-root shims for tools that only scan their own tree:
+Repo-root discovery shims (tools that only scan their own tree at the project root):
 
-| Path             | Points at                |
-| ---------------- | ------------------------ |
-| `.grok/skills`   | `.agents/.master/skills` |
-| `.claude/skills` | `.agents/.master/skills` |
+| Path      | Points at        |
+| --------- | ---------------- |
+| `.claude` | `.agents/claude` |
+| `.grok`   | `.agents/grok`   |
+
+So `.claude/skills/...` and `.grok/skills/...` still resolve to master.
 
 ## Edit a skill
 
@@ -24,13 +26,13 @@ Change the file under `.agents/.master/skills/<name>/`. Everything else follows.
 
 ## Agent-specific override later
 
-If one tool needs different text, replace that agent's symlink for the skill with a real directory
-(or a fork of the skill) and leave the rest linked to `.master`.
+If one tool needs different text, replace that agent's `skills` symlink (or a single skill under it)
+with a real directory and leave the rest linked to `.master`.
 
 ## Install / discover
 
-- **Grok**: project skills via `.grok/skills` and/or `.agents/skills` (both hit master)
-- **Claude Code**: `.claude/skills`
+- **Grok**: `.grok/skills` (shim) and/or `.agents/skills` / `.agents/grok/skills`
+- **Claude Code**: `.claude/skills` (shim -> `.agents/claude/skills`)
 - **Codex / agentskills-style**: `.agents/skills`
-- **Hermes / others**: copy or symlink from `.agents/<agent>/skills` into that tool's skills home if
-  it does not scan the repo automatically
+- **Hermes / others**: copy or symlink from `.agents/<agent>/skills` if the tool does not scan the
+  repo automatically

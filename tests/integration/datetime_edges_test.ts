@@ -21,10 +21,12 @@ Deno.test("integration: parseDate whitespace-only is unparseable", () => {
 });
 
 Deno.test("integration: parseDate single-digit year string is accepted by Date", () => {
-  // V8 treats Date("0") as a year near Y2K, not Invalid Date -- document real edge.
+  // V8 treats Date("0") as a year near Y2K, not Invalid Date. Exact UTC year can be
+  // 1999 or 2000 depending on host TZ (local parse of "0"), so only assert ok + century.
   const r = parseDate("0");
   assertEquals(r.ok, true);
-  assertEquals(r.parts.year, "1999");
+  const year = Number(r.parts.year);
+  assertEquals(year >= 1999 && year <= 2000, true);
 });
 
 Deno.test("integration: parseDate pure garbage is unparseable", () => {

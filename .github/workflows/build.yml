@@ -3,11 +3,9 @@ name: "Build - Check & Compile"
 on:
   push:
     branches:
-      - master
       - main
   pull_request:
     branches:
-      - master
       - main
 
 concurrency:
@@ -16,35 +14,69 @@ concurrency:
 
 env:
   PROJECT_NAME: ft-pipeline
+  COMPILE_PERMS: >-
+    --allow-read
+    --allow-write
+    --allow-env
+    --allow-sys=homedir
+    --allow-run=sqlite3
+    --allow-net
+    --exclude-unused-npm
 
 jobs:
   check:
-    name: "Build - ${{ matrix.task }} (${{ matrix.os }})"
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            task: ch:all
-            run: deno task ch:all
-            sqlite: "true"
-          - os: ubuntu-latest
-            task: compile
-            run: deno task build && test -x dist/ft-pipeline
-            sqlite: "false"
-          - os: windows-latest
-            task: compile
-            run: deno task build
-            sqlite: "false"
-    runs-on: ${{ matrix.os }}
-    if: ${{ !contains(github.event.head_commit.message, 'skip ci') }}
+    name: "Build - ch:all"
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message || '', 'skip ci') }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-deno
         with:
-          install-sqlite: ${{ matrix.sqlite }}
+          install-sqlite: "true"
 
-      - name: ${{ matrix.task }}
+      - name: Format, typecheck, lint
+        run: deno task ch:all
+
+  compile:
+    name: "Build - compile ${{ matrix.target }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin_name: ft-pipeline
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin_name: ft-pipeline.exe
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            bin_name: ft-pipeline
+    runs-on: ${{ matrix.os }}
+    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message || '', 'skip ci') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-deno
+        with:
+          install-sqlite: "false"
+
+      - name: Compile (${{ matrix.target }})
         shell: bash
-        run: ${{ matrix.run }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # shellcheck disable=SC2086
+          deno compile ${{ env.COMPILE_PERMS }} \
+            --target "${{ matrix.target }}" \
+            -o "dist/${{ env.PROJECT_NAME }}" \
+            src/main.ts
+          if [[ -f "dist/${{ matrix.bin_name }}" ]]; then
+            ls -lh "dist/${{ matrix.bin_name }}"
+          elif [[ -f "dist/${{ env.PROJECT_NAME }}" ]]; then
+            ls -lh "dist/${{ env.PROJECT_NAME }}"
+          else
+            ls -la dist/
+            exit 1
+          fi

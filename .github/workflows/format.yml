@@ -3,13 +3,11 @@ name: "Formatting"
 on:
   push:
     branches:
-      - master
       - main
       - develop
       - dev
   pull_request:
     branches:
-      - master
       - main
 
 concurrency:
