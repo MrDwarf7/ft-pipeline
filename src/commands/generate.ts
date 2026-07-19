@@ -33,8 +33,10 @@ const safeJsonArr = (raw: string | null): string[] => {
   try {
     const p = JSON.parse(raw);
     return Array.isArray(p) ? p : [];
-  } catch {
-    return [];
+  } catch (err) {
+    /* Corrupt classification JSON in DB -> treat as empty labels; other errors bubble. */
+    if (err instanceof SyntaxError) return [];
+    throw err;
   }
 };
 
@@ -177,9 +179,10 @@ const scanExistingFilenames = async (dir: string): Promise<Set<string>> => {
       entries.filter((e) => e.isFile && e.name.endsWith(".md"))
     );
     return new Set(entries.map((e) => e.name));
-  } catch {
-    // Directory doesn't exist yet -- nothing to skip
-    return new Set();
+  } catch (err) {
+    /* Missing output dir on first generate is fine; permission/other FS errors fail. */
+    if (err instanceof Deno.errors.NotFound) return new Set();
+    throw err;
   }
 };
 

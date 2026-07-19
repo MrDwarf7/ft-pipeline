@@ -90,11 +90,15 @@ const applyEnvOverrides = (cfg: Config): Config => ({
 });
 
 const loadConfig = (): Config => {
-  let raw: string | null = null;
+  let raw: string;
   try {
     raw = Deno.readTextFileSync(CONFIG_FILE);
-  } catch {
-    return Object.freeze(applyEnvOverrides(DEFAULTS));
+  } catch (err) {
+    /* Missing file is the only intentional default path; anything else fails loud. */
+    if (err instanceof Deno.errors.NotFound) {
+      return Object.freeze(applyEnvOverrides(DEFAULTS));
+    }
+    throw err;
   }
 
   let parsed: unknown;
@@ -141,14 +145,17 @@ export const readConfigFile = (): Config => {
   return configSchema.parse(mergeFile(parseJsonc(raw) as Partial<Config>));
 };
 
-/** Load config from disk, or return built-in defaults if missing/unreadable. */
+/** Load config from disk, or return built-in defaults only when the file is missing.
+ *  Invalid JSONC / schema failures rethrow -- never hide corrupt config as defaults.
+ */
 export const loadConfigFileOrDefault = (): Config =>
   withFallback(
     (() => {
       try {
         return readConfigFile();
-      } catch {
-        return null;
+      } catch (err) {
+        if (err instanceof Deno.errors.NotFound) return null;
+        throw err;
       }
     })(),
     DEFAULTS,

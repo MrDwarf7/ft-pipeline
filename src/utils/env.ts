@@ -42,8 +42,10 @@ const loadDotEnv = (): void => {
     const vars = parseEnvFile(Deno.readTextFileSync(`${envHome}/.env`));
     Object.entries(vars).forEach(([k, v]) => Deno.env.set(k, v));
     dotenvLoaded = true;
-  } catch {
-    // No .env file -- vars must come from the actual environment
+  } catch (err) {
+    /* Missing .env is optional; permission/read errors must not look like success. */
+    if (err instanceof Deno.errors.NotFound) return;
+    throw err;
   }
 };
 

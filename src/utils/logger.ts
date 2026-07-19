@@ -77,11 +77,10 @@ const getLogFile = (): Deno.FsFile => {
 
   logStream?.close();
 
-  try {
-    Deno.mkdirSync(LOG_DIR, { recursive: true });
-  } catch {
-    // ignore if dir already exists
-  }
+  /* recursive: true is a no-op when the dir already exists; real FS errors bubble
+   * to logToFile, which intentionally absorbs logging failures only.
+   */
+  Deno.mkdirSync(LOG_DIR, { recursive: true });
 
   const path = `${LOG_DIR}/${filename}`;
   logStream = Deno.openSync(path, { write: true, create: true, append: true });
@@ -95,6 +94,6 @@ export const logToFile = (line: string): void => {
     const file = getLogFile();
     file.writeSync(encoder.encode(line + "\n"));
   } catch {
-    // silently fail -- we don't want logging errors to crash the pipeline
+    /* Intentional: file-log failures must never crash the pipeline; stdout already wrote. */
   }
 };

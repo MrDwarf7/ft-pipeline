@@ -12,8 +12,10 @@ export const checkCookies = async (): Promise<boolean> => {
   try {
     await Deno.stat(CONFIG.cookiesPath);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    /* Only "file missing" means absent; other stat failures (perms, I/O) rethrow. */
+    if (err instanceof Deno.errors.NotFound) return false;
+    throw err;
   }
 };
 

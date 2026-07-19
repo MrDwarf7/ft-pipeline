@@ -40,8 +40,12 @@ const cleanupLogs = (): void => {
       deleted: toDelete.length,
       kept: files.length - toDelete.length,
     });
-  } catch {
-    // dir missing or read error -- not our problem
+  } catch (err) {
+    /* Log dir may not exist yet; other FS errors are still not fatal for housekeeping. */
+    if (err instanceof Deno.errors.NotFound) return;
+    logger.warn("log housekeeping skipped", {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 };
 
