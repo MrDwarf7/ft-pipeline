@@ -19,8 +19,8 @@ pipeline.db
 pipeline.db-wal
 pipeline.db-shm
 
-# Compiled binary
-ft-pipeline
+# Compiled binary at repo root only (do not match skill dirs named ft-pipeline)
+/ft-pipeline
 .old/
 _fixes/
 _archive/
