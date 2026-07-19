@@ -118,29 +118,30 @@ const loadConfig = (): Config => {
 
 export const CONFIG: Config = loadConfig();
 
-/* Serialization API -- used by the `config` command.
- * Writes the effective config (file layer merged over defaults, before env
- * overrides) so the on-disk file is portable and explicit.
- *
- */
+/** Header lines written above the JSONC body of config.jsonc. */
 const jsoncHeader =
   '// ft-pipeline configuration\n// Precedence: FT_* env vars > this file > built-in defaults\n// Run "ft-pipeline config show" to see effective values.\n\n';
 
+/** Absolute path to the standalone config.jsonc file. */
 export const configFilePath = (): string => CONFIG_FILE;
 
+/** Serialize config as JSONC with the standard header (no env overrides baked in). */
 export const serializeConfig = (cfg: Config): string =>
   `${jsoncHeader}${JSON.stringify(cfg, null, 2)}\n`;
 
+/** Write config to disk under the app config directory. */
 export const writeConfigFile = (cfg: Config): void => {
   Deno.mkdirSync(BASES.appConfigDir, { recursive: true });
   Deno.writeTextFileSync(CONFIG_FILE, serializeConfig(cfg));
 };
 
+/** Read and validate config.jsonc from disk. */
 export const readConfigFile = (): Config => {
   const raw = Deno.readTextFileSync(CONFIG_FILE);
   return configSchema.parse(mergeFile(parseJsonc(raw) as Partial<Config>));
 };
 
+/** Load config from disk, or return built-in defaults if missing/unreadable. */
 export const loadConfigFileOrDefault = (): Config =>
   withFallback(
     (() => {
@@ -153,11 +154,12 @@ export const loadConfigFileOrDefault = (): Config =>
     DEFAULTS,
   );
 
+/** Seed config.jsonc with computed defaults. */
 export const writeConfigFileDefault = (): void => writeConfigFile(DEFAULTS);
 
 /* Retired: ftDbPath, bookmarksJsonl, ftCliDir -- from old fieldtheory-cli DB */
 
-// Taxonomy for classification
+/** Classification type labels. */
 export const TYPES = [
   "tool",
   "technique",
@@ -171,6 +173,7 @@ export const TYPES = [
   "resource",
 ] as const;
 
+/** Classification domain labels. */
 export const DOMAINS = [
   "agentic",
   "ai-ml",

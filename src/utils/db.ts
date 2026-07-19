@@ -33,7 +33,7 @@ const interpolate = (
   });
 };
 
-// sqlite3 with stdout as args -- returns stdout text
+/** Run sqlite3 CLI; returns decoded stdout/stderr and exit code. */
 const sqlite3 = (
   dbPath: string,
   args: string[],
@@ -50,7 +50,7 @@ const sqlite3 = (
   };
 };
 
-// Execute SQL with no result expected (INSERT, UPDATE, CREATE, etc.)
+/** Execute SQL with no result set (INSERT/UPDATE/CREATE). */
 const execSql = (dbPath: string, sql: string): void => {
   const { stderr, code } = sqlite3(dbPath, [sql]);
   if (code !== 0) {
@@ -58,7 +58,7 @@ const execSql = (dbPath: string, sql: string): void => {
   }
 };
 
-// Run a query and return parsed JSON results
+/** Run a query and return rows parsed from sqlite3 JSON mode. */
 const querySql = (dbPath: string, sql: string): Record<string, unknown>[] => {
   const { stdout, stderr, code } = sqlite3(dbPath, [".mode json", sql]);
   if (code !== 0) {

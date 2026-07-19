@@ -47,7 +47,8 @@ interface XtracticleResponse {
 type Tweet = XtracticleResponse["tweets"][number];
 
 /** Safe tweet access. Centralizes the index-lookup so callers never index
- *  tweets[] inline (noUncheckedIndexedAccess makes that T | undefined). */
+ *  tweets[] inline (noUncheckedIndexedAccess makes that T | undefined).
+ */
 const getTweet = (data: XtracticleResponse, i = 0): Tweet | null => data.tweets[i] ?? null;
 
 interface Row {
@@ -513,8 +514,9 @@ export const runExtract = (options: ExtractOptions): void => {
 
     if (options.dryRun) dryRunPreview(rows);
 
-    // TODO: We can probably combine the batches themselves into the reduce operation.
-    // Also means we shouldn't have to rely on the `allResults` array either.
+    /* TODO: We can probably combine the batches themselves into the reduce operation.
+     * Also means we shouldn't have to rely on the `allResults` array either.
+     */
 
     const allResults: ExtractResult[] = [];
     const BATCH_SIZE = 10;

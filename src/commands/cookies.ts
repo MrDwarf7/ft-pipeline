@@ -66,7 +66,6 @@ export const getCookies = async (password: string): Promise<CookieData> => {
   return data;
 };
 
-// AES-GCM encryption
 const SALT_LEN = 16;
 const IV_LEN = 12;
 const ITERATIONS = 100_000;

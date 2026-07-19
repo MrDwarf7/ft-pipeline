@@ -17,7 +17,7 @@ interface SyncOptions {
   dryRun?: boolean;
 }
 
-// Insert new tweets into our pipeline DB
+/** Insert or update tweets in pipeline.db. */
 const importIntoTipelineDb = (
   tweets: TweetData[],
 ): { imported: number; updated: number } => {
@@ -57,7 +57,7 @@ const importIntoTipelineDb = (
   return { imported, updated: 0 };
 };
 
-// Query existing tweet IDs from our DB
+/** Load all existing tweet_ids from pipeline.db. */
 const getExistingIds = (): Set<string> => {
   const db = getPipelineDb();
 

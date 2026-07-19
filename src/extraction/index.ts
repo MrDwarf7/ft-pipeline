@@ -38,6 +38,7 @@ export type CreateGraphQL = () => UncheckedSource<GraphQLConfig>;
 
 export { createGraphQL } from "./graphql.ts";
 
-// Future:
-// export { createXtracticle } from "./xtracticle.ts";
-// export { createWebsites } from "./websites.ts";
+/* Future:
+ * export { createXtracticle } from "./xtracticle.ts";
+ * export { createWebsites } from "./websites.ts";
+ */

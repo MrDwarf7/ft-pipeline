@@ -1,3 +1,4 @@
+/** OpenAI-compatible LLM client (llama-server / LM Studio). */
 import { type ConnectedLLM, type LLMChatOptions, type LLMProvider } from "./index.ts";
 
 interface OpenAICompatConfig {

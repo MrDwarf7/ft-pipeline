@@ -222,7 +222,8 @@ const parseResponse = (
       if (!tweetResult) return null;
 
       /* X API returns both old (nested) and new (flat) tweet formats.
-       * Wrap flat format so parseTweet works unchanged. */
+       * Wrap flat format so parseTweet works unchanged.
+       */
       const tweetData = (tweetResult as Record<string, unknown>).tweet
         ? tweetResult // old format: already has tweet wrapper
         : { tweet: tweetResult }; // flat format: wrap it

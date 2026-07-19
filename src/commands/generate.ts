@@ -47,7 +47,7 @@ const bookmarkTemplate: BookmarkTemplate = (b) => {
   const dateUnderscore = `${year}_${month}_${day}`;
 
   /* Derive a display title from the first line of content.
-   * Strip any leading markdown heading markers so we don't get double `#` in the template
+   * Strip any leading markdown heading markers so we don't get double `#` in the template.
    */
   const firstLine = (b.display_text.split("\n")[0] ?? "")
     .replace(/^#+\s*/, "")

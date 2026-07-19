@@ -47,8 +47,9 @@ const appConfigDir = `${PATHS.config}/${APP_NAME}`;
 const appDataDir = `${PATHS.data}/${APP_NAME}`;
 const appCacheDir = `${PATHS.cache}/${APP_NAME}`;
 
-// Both xdg-basedir and env-paths only return path strings.
-// Create app dirs on startup so downstream code can write without checks.
+/* Both xdg-basedir and env-paths only return path strings.
+ * Create app dirs on startup so downstream code can write without checks.
+ */
 await Promise.all(
   [appConfigDir, appDataDir, appCacheDir].map((d) =>
     Deno.mkdir(d, { recursive: true }).catch(() => {})
@@ -68,9 +69,10 @@ export const BASES = Object.freeze({
   // Encrypted X session cookies
   cookiesPath: `${appConfigDir}/.sync-cookies.enc`,
 
-  // Final generated output -- written directly to the wiki so the cron agent
-  // can pick up new notes without an intermediary folder.
-  // Subdirs: bookmarks/, categories/, domains/, entities/
+  /* Final generated output -- written directly to the wiki so the cron agent
+   * can pick up new notes without an intermediary folder.
+   * Subdirs: bookmarks/, categories/, domains/, entities/
+   */
   mdOutputDir: `${homeDir}/StoneVault/wiki`,
 
   // Bookmark classification results
@@ -79,8 +81,9 @@ export const BASES = Object.freeze({
   // Pipeline logs
   logDir: `${appConfigDir}/logs`,
 
-  // StoneVault is the actual vault location (symlinked from external drive).
-  // ~/wiki -> StoneVault/wiki.
+  /* StoneVault is the actual vault location (symlinked from external drive).
+   * ~/wiki -> StoneVault/wiki.
+   */
   clippingsBase: `${homeDir}/StoneVault/Clippings`,
 
   // Static API endpoints

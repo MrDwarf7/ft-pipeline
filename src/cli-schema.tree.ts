@@ -82,13 +82,11 @@ export const resolveHelp = (
   return walk(top, { remaining: rest, walked: [head] });
 };
 
-/** Type guard: only the root carries globalOptions.
- */
+/** Type guard: only the root carries globalOptions. */
 export const isHelpRoot = (node: HelpRoot | CommandNode): node is HelpRoot =>
   "globalOptions" in node;
 
-/** Every resolvable path (branches and leaves), for completions or exhaustive generation.
- */
+/** Every resolvable path (branches and leaves), for completions or exhaustive generation. */
 export const listCommandPaths = (
   root: HelpRoot,
 ): readonly (readonly string[])[] => {
@@ -105,8 +103,7 @@ export const listCommandPaths = (
   return Object.entries(root.commands).flatMap(([key, node]) => collect(node, [key]));
 };
 
-/** Global + local options for a node, for rendering.
- */
+/** Global + local options for a node, for rendering. */
 export const flattenOptions = (
   root: HelpRoot,
   node: HelpRoot | CommandNode,
@@ -218,8 +215,7 @@ const collectHelpPath = (argv: string[]): string[] | null => {
   return idx === -1 ? null : argv.slice(0, idx);
 };
 
-/** Resolve + render the help screen for argv, or null if no -h/--help.
- */
+/** Resolve + render the help screen for argv, or null if no -h/--help. */
 export const findHelpScreen = (argv: string[]): string | null => {
   const path = collectHelpPath(argv);
   if (path === null) return null;
