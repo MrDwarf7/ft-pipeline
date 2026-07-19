@@ -1,130 +1,204 @@
 # ft-pipeline
 
-Bookmark sync, extract, classify, generate pipeline for
-[fieldtheory-cli](https://github.com/andrewfarah/fieldtheory).
+Turn your X (Twitter) bookmarks into a local archive: plain text clippings, a SQLite
+database, and Obsidian-friendly markdown pages sorted by type and topic.
 
-## Setup
+You do not need to know GraphQL or TypeScript to use it. You need Deno, `sqlite3` on your
+PATH, your X cookies (for sync), and a local LLM only if you want automatic classification.
+
+## What it does
+
+Roughly in order:
+
+1. **Sync** -- pull bookmarks from X into a local DB
+2. **Extract** -- fetch full text / articles via [xtracticle](https://xtracticle.com) into Clippings
+3. **Merge** -- fold enriched clipping text back into the DB
+4. **Classify** -- label type + domain with a local LLM (optional if you skip this step)
+5. **Generate** -- write one markdown stub per bookmark into your vault
+6. **Indexes** -- category / domain / entity index pages (only rewrite when content changes)
+
+`full` runs that whole sequence. Individual steps still work if you only want sync + generate.
+
+## Requirements
+
+| Need | Why |
+| ---- | --- |
+| [Deno](https://deno.land/) 2.x | Runs the CLI |
+| `sqlite3` CLI | Database (system package, not a Node driver) |
+| X session cookies | Sync only |
+| Local LLM at `localhost:1234` (OpenAI-compatible) | Classify only |
+| Network to xtracticle.com | Extract only |
+
+Outputs default under XDG config (`~/.config/ft-pipeline/` for DB/logs/cookies) and your
+vault paths from config (Clippings + wiki markdown).
+
+## Quick start
 
 ```bash
-# One-time: create the pipeline DB schema
+# Install deps if needed (Arch example)
+# pacman -S deno sqlite
+
+git clone <this-repo> && cd ft-pipeline
+
+# Schema (safe to re-run)
 deno run --allow-all src/main.ts migrate
 
-# Extract cookies (one-time, interactive)
+# One-time: capture encrypted cookies from a logged-in browser session
 deno run --allow-all src/main.ts cookies extract
 
-# Or set password via env for headless use
+# Env for headless / cron (paths are yours)
+export FT_COOKIES_PATH="$HOME/.config/ft-pipeline/.sync-cookies.enc"
 export FT_PIPELINE_PASSWORD="your-password"
+
+# Optional: create a config file you can edit later
+deno run --allow-all src/main.ts config init
+deno run --allow-all src/main.ts config show
+
+# Whole pipeline (needs cookies password + LLM for classify)
+deno run --allow-all src/main.ts full --password "$FT_PIPELINE_PASSWORD"
+```
+
+Or compile once and use a binary:
+
+```bash
+deno task build
+./dist/ft-pipeline migrate
+./dist/ft-pipeline full --password "$FT_PIPELINE_PASSWORD"
 ```
 
 ## Commands
 
 ```bash
-# Full pipeline (migrate -> sync -> extract -> merge -> classify -> generate -> indexes)
-deno run --allow-all src/main.ts full --password "$FT_PIPELINE_PASSWORD"
+deno run --allow-all src/main.ts <command> [options]
+# after build:
+./dist/ft-pipeline <command> [options]
+```
 
-# Individual steps
-deno run --allow-all src/main.ts sync --password "$FT_PIPELINE_PASSWORD"
+| Command | What you get |
+| ------- | ------------ |
+| `migrate` | Create/update the pipeline DB |
+| `cookies extract` / `cookies check` | Store or verify encrypted X cookies |
+| `sync` | Fetch new bookmarks from X |
+| `extract` | Pull full content into Clippings folders |
+| `merge` | Copy clipping text into the DB |
+| `classify` | LLM labels (type + domain) |
+| `generate` | Per-bookmark markdown pages |
+| `indexes` | Category / domain / entity indexes |
+| `config` (`show`, `file`, `init`, `set`, `migrate`) | Inspect or edit `config.jsonc` |
+| `full` | Run migrate through indexes in order |
+
+Useful flags (see `--help` for the full list):
+
+```bash
+# Skip re-downloading clippings you already have
 deno run --allow-all src/main.ts extract --skip-existing
-deno run --allow-all src/main.ts merge
-deno run --allow-all src/main.ts classify
-deno run --allow-all src/main.ts generate
-deno run --allow-all src/main.ts indexes
 
-# Dry runs
+# Peek without writing
 deno run --allow-all src/main.ts extract --dry-run --limit 10
 deno run --allow-all src/main.ts classify --dry-run --limit 10
+
+# Password for sync/full (or FT_PIPELINE_PASSWORD)
+deno run --allow-all src/main.ts sync --password "$FT_PIPELINE_PASSWORD"
 ```
 
-Or use deno tasks:
+`deno task start -- <command>` also works if you prefer tasks (`start` is just a thin runner).
+
+## Config
+
+Default file: `~/.config/ft-pipeline/config.jsonc` (override with `-C` / `--config` when supported).
 
 ```bash
-deno task start
-deno task migrate
-deno task sync
-deno task extract
-deno task merge
-deno task classify
-deno task generate
-deno task indexes
-deno task full
+deno run --allow-all src/main.ts config init     # write defaults
+deno run --allow-all src/main.ts config show     # effective values
+deno run --allow-all src/main.ts config file     # print path
+deno run --allow-all src/main.ts config set maxExternalCallAttempts 4
+deno run --allow-all src/main.ts config migrate  # rewrite old key names on disk
+# same as migrate:
+deno run --allow-all src/main.ts config --migrate
 ```
 
-## Cron
+Resolution order (highest wins):
+
+1. `FT_*` environment variables (paths, password, etc.)
+2. The config file
+3. Built-in defaults
+
+Retry budget for X / xtracticle / the LLM is `maxExternalCallAttempts` (default 4). Older files
+that still say `maxRetries` still load; on a normal interactive run you may be asked to migrate
+the key, or you can run `config migrate` yourself. Non-interactive runs never block on that prompt.
+
+## Environment
+
+| Variable | When | Purpose |
+| -------- | ---- | ------- |
+| `FT_COOKIES_PATH` | sync / full | Encrypted cookies file |
+| `FT_PIPELINE_PASSWORD` | sync / full | Decrypt cookies (or `--password`) |
+| `FT_PIPELINE_DB_PATH` | optional | Override DB path |
+| `FT_MARKDOWN_DIR` | optional | Wiki output root |
+| `FT_CLIPPINGS_BASE` | optional | Clippings root |
+| `FT_NO_HOUSEKEEPING` | optional | Skip log rotation cleanup |
+| `FT_NO_CONFIG_MIGRATE_PROMPT` | optional | Never prompt to rewrite legacy config keys |
+
+You can put secrets in `~/.config/ft-pipeline/.env` (loaded automatically) or export them in the
+shell.
+
+## Cron / unattended
 
 ```bash
-# 3x daily sync (add to crontab or hermes cron)
-0 10,16,2 * * * FT_PIPELINE_PASSWORD="$(cat ~/.config/ft-pipeline/.pw)" deno run --allow-all /path/to/src/main.ts full
+# Example: a few times a day. Password from a file only you can read.
+0 10,16,2 * * * FT_COOKIES_PATH="$HOME/.config/ft-pipeline/.sync-cookies.enc" \
+  FT_PIPELINE_PASSWORD="$(cat "$HOME/.config/ft-pipeline/.pw")" \
+  /usr/bin/deno run --allow-all /path/to/ft-pipeline/src/main.ts full
 ```
 
-### Automated LLM management
+`full` keeps going past soft step failures (e.g. classify if the model is down) and logs what
+failed. Hard errors (missing DB path permissions, bad password, etc.) still stop that step.
 
-`scripts/run-with-llm.sh` wraps any CLI command with automatic LLM server lifecycle:
+### Optional: auto-start the LLM
 
-- Detects connection failures in command output (exits 0 even when LLM is down)
-- Starts the LLM server if not running, waits for readiness, retries
-- Cleans up only the server it started -- leaves pre-existing servers untouched
+`scripts/run-with-llm.sh` starts a local LLM server if needed, runs a command, then stops only
+the server it started:
 
 ```bash
-# Defaults: runs `ft-pipeline full`, starts `llama-me -r` on port 1234
 ./scripts/run-with-llm.sh
-
-# Override for a different binary or command
-PIPELINE="my-classifier" PIPELINE_CMD="run" ./scripts/run-with-llm.sh
-
-# Custom LLM server
-LLM_START_CMD="my-llm-server -p 8080" LLM_PROCESS="my-llm-server" LLM_PORT=8080 ./scripts/run-with-llm.sh
+# PIPELINE=ft-pipeline PIPELINE_CMD=full by default
 ```
 
-| Variable        | Default        | Description                              |
-| --------------- | -------------- | ---------------------------------------- |
-| `PIPELINE`      | `ft-pipeline`  | Binary/command to run                    |
-| `PIPELINE_CMD`  | `full`         | Subcommand passed to the binary          |
-| `LLM_PROCESS`   | `llama-server` | Process name for `pgrep -x` detection    |
-| `LLM_START_CMD` | `llama-me -r`  | Command to start the LLM server          |
-| `LLM_PORT`      | `1234`         | Port for readiness check (`/v1/models`)  |
-| `LLM_TIMEOUT`   | `60`           | Max seconds to wait for server readiness |
+| Variable | Default | Meaning |
+| -------- | ------- | ------- |
+| `PIPELINE` | `ft-pipeline` | Binary to run |
+| `PIPELINE_CMD` | `full` | Subcommand |
+| `LLM_PROCESS` | `llama-server` | Name for process check |
+| `LLM_START_CMD` | `llama-me -r` | How to start the server |
+| `LLM_PORT` | `1234` | Readiness check port |
+| `LLM_TIMEOUT` | `60` | Seconds to wait for `/v1/models` |
 
-## Architecture
+## Layout (for the curious)
 
 ```
-src/main.ts             Entry point, command dispatch
-src/types.ts            Command enum, Args interface, parse helpers
-src/cli-schema.ts       Single source of truth for CLI commands and options
-src/config.ts           All paths, settings, taxonomy
-src/utils/pipeline.ts   Pipeline composition and full run orchestration
-src/commands/
-  migrate.ts            Create/migrate pipeline DB schema
-  cookies.ts            Cookie extraction/decryption
-  sync.ts               Native GraphQL sync from X -> pipeline.db
-  extract.ts            xtracticle API -> clippings + DB linking
-  merge.ts              Clippings enriched text -> DB
-  classify.ts           LLM classification orchestrator
-  generate.ts           Template-based .md generation from pipeline.db
-  indexes.ts            Category/domain/entity index pages
-  help.ts               Help text and usage output
-src/llm/
-  index.ts              LLM provider interface + factory
-  openai-compat.ts      OpenAI-compatible API client (llama-server)
-src/extraction/
-  index.ts              Extraction source interface + factory
-  graphql.ts            X GraphQL client (native, no ft-cli)
-  schema.ts             Zod schemas for response validation
-  types.ts              Shared types for extraction sources
-src/utils/
-  bases.ts              App environment + XDG path resolution
-  db.ts                 Pipeline DB singleton
-  crypto.ts             AES-GCM encryption for cookie file
-  frontmatter.ts        Shared frontmatter parser
-  hash.ts               SHA-256 hashing for content comparison
-  logger.ts             Structured JSON logger
-  env.ts                Env var checker + .env loader
-  pipeline.ts           Pipeline orchestration
+src/main.ts                 CLI entry
+src/config.ts               Paths, taxonomy, maxExternalCallAttempts
+src/cli-schema.tree.ts      Commands / help tree
+src/cli-schema.types.ts     Schema types
+src/commands/               migrate, sync, extract, merge, classify, generate, indexes, config
+src/extraction/             X GraphQL + xtracticle client
+src/llm/                    OpenAI-compatible local model client
+src/utils/db.ts             sqlite3 CLI helpers (insert/upsert/update/select)
+src/utils/http.ts           Shared fetch + 429 retry
 ```
 
-## Dependencies
+Agent-oriented detail lives in [AGENTS.md](./AGENTS.md). Open design notes: [docs/](./docs/).
 
-- Deno 2.x
-- sqlite3 CLI (system package)
-- llama-server running locally at :1234 with a local model
-- xtracticle.com API access
-- X session cookies (for sync)
+## Tests
+
+```bash
+deno task test:unit          # unit + integration
+deno task test:e2e           # CLI smoke (temp DB, help, config)
+deno task ch:all             # fmt + typecheck + lint
+```
+
+## License / upstream
+
+Built for personal bookmark workflows around
+[fieldtheory-cli](https://github.com/andrewfarah/fieldtheory). This repo is its own pipeline and
+database; it does not shell out to `ft` for day-to-day runs.
