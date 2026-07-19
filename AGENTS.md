@@ -11,15 +11,71 @@ regressions.
 
 ## Documentation Standards
 
-- **Use `/* */` for multi-line comments.** Do not use consecutive `//` lines as a substitute for
-  block comments.
 - **No unicode symbols in source code.** Em-dashes `--`, en-dashes `--`, smart quotes, etc. are
   banned from `.ts` files. Use plain ASCII: `--` for dashes, `'` and `"` for quotes.
 - **Exception:** Unicode is allowed inside template strings that produce user-facing output
   (markdown, wiki pages, log messages displayed to humans).
-- **Keep comments lean.** Explain _why_, not _what_. If the code is self-evident, don't comment.
+- **Keep comments lean.** Explain _why_, not _what_. The code shows what it does; a comment
+  explains why a choice was made or why it must stay that way. If the code is self-evident,
+  don't comment.
 - **No section headers in comments.** Don't use `-- Pure helpers --` or similar banners.
-- **File headers:** One-line `/** Description of what this file does. */` at most.
+- **Block comments that are NOT docs use `/* */` (single star).** Do not use consecutive `//`
+  lines as a substitute for a block comment.
+
+### Doc comments (`/** */`, double star) -- the form is enforced
+
+A doc comment sits directly above the symbol it describes (interface, type, function, const,
+method, attribute). Two valid shapes:
+
+**Block form** (multi-line, or one long thought). Pattern:
+
+```
+/** first line of text (or `/**` alone, text on the next line)
+ *  continuation line(s) -- each begins with ` * ` (space, star, space)
+ *
+ */
+export interface Example { ... }
+```
+
+Rules:
+- Open with `/**`. The first text may follow on the same line or start on the next line.
+- Every continuation line begins with ` * ` (space, star, space).
+- The text MUST end with a blank doc line: a ` *` line with nothing after the star.
+- The comment closes on its own line with ` */`.
+- The very next line after ` */` is the documented symbol -- no blank line between the closer
+  and the symbol.
+
+**Single-line form.** `/**` and `*/` on the same line:
+
+```
+/** Valid keys at the failure point. Empty when the parent was a leaf. */
+readonly available: readonly string[];
+```
+
+Rules:
+- Allowed only when the doc is a single short sentence. "Short" = under a reasonable length,
+  judged in this order: the project's average line length, then the formatter's configured max
+  width, then "noticeably shorter than that."
+- Place it on its own line directly above the symbol, or inline on the same line as the symbol
+  it documents.
+
+Canonical examples live in `src/cli-schema.types.ts`: the `LeafCommand` doc (block form) and the
+`HelpLookup.available` doc (single-line form).
+
+### File headers
+
+A file's leading doc comment uses the same two shapes: a single-line `/** ... */` when short, or
+the block form when it needs more than one line to say what the file is/does. Keep it to what the
+file is and does -- not a novel.
+
+### Exempt from the doc form
+
+- **Notable comments** (TODO, HACK, BUG, TEST, FIXME, etc.) are not doc comments. They use the
+  single-star block (`/* TODO: ... */`) or `// TODO: ` and follow their own marker pattern. They
+  do not need to wrap in the block form above.
+- **Semantic comments** -- a comment whose only job is to force a layout choice (e.g. force an
+  array/object to wrap on purpose, or mark an intentional structure) -- are also exempt. Use `//`
+  or `/* */` as the situation needs.
 
 ## What This Is
 
