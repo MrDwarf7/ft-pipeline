@@ -13,10 +13,23 @@ interface ClippingEntry {
   type: string;
 }
 
-const TYPE_RANK: Record<string, number> = {
-  articles: 3,
-  posts: 2,
-  media: 1,
+/** Rank for clipping type priority: article > post > media. Higher wins.
+ *  Accepts extract singular labels and legacy plural labels.
+ */
+export const clippingTypeRank = (type: string): number => {
+  if (type === "article" || type === "articles") return 3;
+  if (type === "post" || type === "posts") return 2;
+  if (type === "media") return 1;
+  return 0;
+};
+
+/** True when the candidate clipping should replace an existing one. */
+export const shouldPreferClipping = (
+  existingType: string | undefined,
+  candidateType: string,
+): boolean => {
+  if (existingType === undefined) return true;
+  return clippingTypeRank(candidateType) > clippingTypeRank(existingType);
 };
 
 const readClippings = async (): Promise<Map<string, ClippingEntry>> => {
@@ -39,13 +52,11 @@ const readClippings = async (): Promise<Map<string, ClippingEntry>> => {
         const body = extractBody(content);
         if (!body || body.trim().length === 0) return null;
 
-        // Priority: articles > posts > media (richest content wins)
+        // Priority: article > post > media (richest content wins)
         const type = fm.type ?? "post";
         const existing = clippings.get(tweetId);
-        const newRank = TYPE_RANK[type] || 0;
-        const existingRank = existing ? TYPE_RANK[existing.type] || 0 : 0;
 
-        if (!existing || newRank > existingRank) {
+        if (shouldPreferClipping(existing?.type, type)) {
           clippings.set(tweetId, {
             body: body.slice(0, 5000), // Cap at 5000 chars
             type,
