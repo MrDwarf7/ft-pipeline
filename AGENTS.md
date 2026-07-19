@@ -105,7 +105,8 @@ ft-pipeline/
 |   |-- run-with-llm.sh    <- LLM server lifecycle management
 |-- src/
 |   |-- main.ts            <- Entry point, CLI arg parsing, command dispatch
-|   |-- cli-schema.ts      <- Single source of truth for CLI commands and options
+|   |-- cli-schema.tree.ts <- CLI command tree (commands and options)
+|   |-- cli-schema.types.ts <- CLI schema types (OptionSpec, LeafCommand, etc.)
 |   |-- types.ts           <- Command enum, Args interface, parse helpers
 |   |-- config.ts          <- All paths, thresholds, taxonomy constants
 |   |-- commands/
@@ -137,7 +138,6 @@ ft-pipeline/
 |       |-- hash.ts        <- SHA-256 hashing for content comparison
 |       |-- logger.ts      <- Structured JSON logger
 |       |-- pipeline.ts    <- Pipeline composition and full run orchestration
-|       |-- ft-cli.ts      <- DEAD CODE -- kept for reference
 ```
 
 ## Tech Stack
