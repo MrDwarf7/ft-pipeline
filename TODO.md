@@ -117,13 +117,13 @@ for manual install; package-manager channels are **not** wired yet.
 
 **Wanted later (backlog -- not started):**
 
-| Channel                         | Typical home                                                          | Notes                                                          |
-| ------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Homebrew                        | External tap (`homebrew-ft-pipeline` or similar) + optional formula stub here | Formula can `url` nightly/release assets                       |
-| Scoop (Windows)                 | Scoop bucket repo or `bucket/` snippet                                | Point at Windows zip from releases                             |
-| Chocolatey                      | `packaging/chocolatey/` nuspec + tools scripts                        | Needs package maintainer + moderation                          |
-| AUR (Arch)                      | Usually a **separate** AUR git package; keep a template here          | `PKGBUILD` + `.SRCINFO` template under packaging               |
-| Other distros (deb/rpm/nix/…)   | Same packaging tree when we care                                      | Prefer release artifacts over building Deno on every target    |
+| Channel                       | Typical home                                                                  | Notes                                                       |
+| ----------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Homebrew                      | External tap (`homebrew-ft-pipeline` or similar) + optional formula stub here | Formula can `url` nightly/release assets                    |
+| Scoop (Windows)               | Scoop bucket repo or `bucket/` snippet                                        | Point at Windows zip from releases                          |
+| Chocolatey                    | `packaging/chocolatey/` nuspec + tools scripts                                | Needs package maintainer + moderation                       |
+| AUR (Arch)                    | Usually a **separate** AUR git package; keep a template here                  | `PKGBUILD` + `.SRCINFO` template under packaging            |
+| Other distros (deb/rpm/nix/…) | Same packaging tree when we care                                              | Prefer release artifacts over building Deno on every target |
 
 **In-repo layout convention (when we start):**
 
