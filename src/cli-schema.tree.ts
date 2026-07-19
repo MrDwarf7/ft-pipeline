@@ -248,15 +248,53 @@ const syncCommand = {
 
 const cookiesCommand = {
   name: "cookies",
-  description: "Inspect and clear stored session cookies",
-  options: {
-    clear: {
-      flags: ["--clear"],
-      description: "Delete all stored cookies",
+  description: "Encrypt and verify X session cookies",
+  subcommands: {
+    extract: {
+      name: "extract",
+      description: "Interactively encrypt browser cookies for sync",
+      subcommands: null,
+    },
+    check: {
+      name: "check",
+      description: "Verify the encrypted cookies file exists / loads",
+      subcommands: null,
     },
   },
+} as const satisfies BranchCommand;
+
+const fullCommand = {
+  name: "full",
+  description: "Run migrate -> sync -> extract -> merge -> classify -> generate -> indexes",
   subcommands: null,
 } as const satisfies LeafCommand;
+
+const completionCommand = {
+  name: "completion",
+  description: "Print shell completion script (bash|zsh|fish|pwsh)",
+  subcommands: {
+    bash: {
+      name: "bash",
+      description: "Bash completion script",
+      subcommands: null,
+    },
+    zsh: {
+      name: "zsh",
+      description: "Zsh completion script",
+      subcommands: null,
+    },
+    fish: {
+      name: "fish",
+      description: "Fish completion script",
+      subcommands: null,
+    },
+    pwsh: {
+      name: "pwsh",
+      description: "PowerShell completion script",
+      subcommands: null,
+    },
+  },
+} as const satisfies BranchCommand;
 
 const extractCommand = {
   name: "extract",
@@ -396,5 +434,7 @@ export const ALL_OPTIONS = {
     generate: generateCommand,
     indexes: indexesCommand,
     config: configCommand,
+    full: fullCommand,
+    completion: completionCommand,
   },
 } as const satisfies HelpRoot;

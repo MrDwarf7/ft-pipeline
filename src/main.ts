@@ -14,6 +14,7 @@ import { findHelpScreen } from "./cli-schema.tree.ts";
 import { pipeline, runFull } from "./utils/pipeline.ts";
 import { checkCookies, runCookieExtract } from "./commands/cookies.ts";
 import { runConfig } from "./commands/config.ts";
+import { runCompletion } from "./commands/completion.ts";
 import { logger } from "./utils/logger.ts";
 import { CONFIG, promptConfigMigrationIfNeeded } from "./config.ts";
 
@@ -134,6 +135,10 @@ const main = async () => {
 
       case Command.Full:
         await runFull(args);
+        break;
+
+      case Command.Completion:
+        runCompletion(subcommand);
         break;
 
       default:

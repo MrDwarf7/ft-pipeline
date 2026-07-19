@@ -13,6 +13,7 @@ export const Command = {
   Indexes: "indexes",
   Config: "config",
   Full: "full",
+  Completion: "completion",
 } as const;
 
 export type Command = (typeof Command)[keyof typeof Command];

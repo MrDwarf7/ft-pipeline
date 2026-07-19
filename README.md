@@ -189,9 +189,27 @@ deno task start <command> [options]
 | `indexes`         | Category / domain / entity indexes                                     |
 | `config`          | `show`, `file`, `init`, `set`, `migrate`                               |
 | `full`            | migrate -> sync -> extract -> merge -> classify -> generate -> indexes |
+| `completion`      | Print shell completion script (`bash` / `zsh` / `fish` / `pwsh`)       |
 
-`full` is implemented and used in practice; it may not appear on `--help` until the schema lists it.
-Prefer the binary or `deno run … full` the same way as other commands.
+### Shell completions
+
+Scripts are generated from the CLI schema (same tree as `--help`):
+
+```bash
+# bash
+eval "$(ft-pipeline completion bash)"
+# or: ft-pipeline completion bash >> ~/.bashrc
+
+# zsh (put on fpath, then compinit)
+ft-pipeline completion zsh > "${fpath[1]}/_ft-pipeline"
+
+# fish
+ft-pipeline completion fish > ~/.config/fish/completions/ft-pipeline.fish
+
+# PowerShell
+ft-pipeline completion pwsh | Out-String | Invoke-Expression
+# or append to $PROFILE
+```
 
 ### Useful flags
 

@@ -25,7 +25,11 @@ Deno.test("parse config: valueName => string, else boolean", () => {
   assertEquals(Array.isArray(booleans) && booleans.includes("help"), true);
 });
 
-Deno.test("tree exposes all 9 top commands", () => {
+Deno.test("tree exposes top commands including full and completion", () => {
   const names = Object.keys(ALL_OPTIONS.commands);
-  assertEquals(names.length, 9);
+  assertEquals(names.includes("migrate"), true);
+  assertEquals(names.includes("full"), true);
+  assertEquals(names.includes("completion"), true);
+  assertEquals(names.includes("config"), true);
+  assertEquals(names.length >= 11, true);
 });
