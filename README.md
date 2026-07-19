@@ -42,9 +42,9 @@ export FT_PIPELINE_PASSWORD="..."                  # ask the human
 deno task start full --password "$FT_PIPELINE_PASSWORD"
 ```
 
-Prefer `./dist/ft-pipeline` after `deno task build` for cron. Release builds use least-privilege
-flags (not `--allow-all`). Soft failures inside `full` (e.g. classify with no LLM) are logged;
-remaining steps still run.
+Prefer a PATH install for cron: `deno task install` then `ft-pipeline …`. Release builds use
+least-privilege flags (not `--allow-all`). Soft failures inside `full` (e.g. classify with no LLM)
+are logged; remaining steps still run.
 
 Humans who are not using an agent: skip this section and keep reading.
 
@@ -113,15 +113,26 @@ deno task start config init
 deno task start full --password "$FT_PIPELINE_PASSWORD"
 ```
 
-Prefer a binary (cron-friendly; DB is embedded):
+Prefer a binary on your PATH (cron-friendly; DB is embedded):
 
 ```bash
-deno task build
-./dist/ft-pipeline migrate
-./dist/ft-pipeline full --password "$FT_PIPELINE_PASSWORD"
+deno task install
+# -> $XDG_BIN, else $XDG_BIN_HOME, else ~/.local/bin
+# last resort: leaves dist/ft-pipeline and prints how to run it
+
+ft-pipeline migrate
+ft-pipeline full --password "$FT_PIPELINE_PASSWORD"
 ```
 
-Cross-compile (also used by CI release matrix):
+Install destination order (first match wins):
+
+1. `INSTALL_DIR` (explicit override)
+2. `$XDG_BIN`
+3. `$XDG_BIN_HOME`
+4. `$HOME/.local/bin` (created if missing)
+5. Build only under `dist/` and tell you the path
+
+Cross-compile (also used by CI release matrix; not installed to PATH):
 
 ```bash
 deno task build:linux      # x86_64-unknown-linux-gnu
@@ -136,13 +147,13 @@ After setup you mostly care about:
 
 ```bash
 # catch up bookmarks + refresh wiki
-./dist/ft-pipeline full --password "$FT_PIPELINE_PASSWORD"
+ft-pipeline full --password "$FT_PIPELINE_PASSWORD"
 
 # or pieces
-./dist/ft-pipeline sync --password "$FT_PIPELINE_PASSWORD"
-./dist/ft-pipeline extract --skip-existing
-./dist/ft-pipeline generate
-./dist/ft-pipeline indexes
+ft-pipeline sync --password "$FT_PIPELINE_PASSWORD"
+ft-pipeline extract --skip-existing
+ft-pipeline generate
+ft-pipeline indexes
 ```
 
 If classify fails because the model is down, `full` logs it and keeps going on the rest of the
@@ -166,9 +177,12 @@ it work" checklist. Packaging: [`.agents/README.md`](./.agents/README.md).
 ### Invocation
 
 ```bash
+deno task install                 # once: binary on PATH (see install order above)
+ft-pipeline <command> [options]
+
+# without install
 deno task start <command> [options]
-# or
-./dist/ft-pipeline <command> [options]
+# or after build only: ./dist/ft-pipeline <command>
 ```
 
 `deno task start` is least-privilege `deno run` (read/write/env/sys=homedir/net). Tests still use
@@ -214,14 +228,14 @@ ft-pipeline completion pwsh | Out-String | Invoke-Expression
 ### Useful flags
 
 ```bash
-./dist/ft-pipeline --help
-./dist/ft-pipeline config --help
+ft-pipeline --help
+ft-pipeline config --help
 
-./dist/ft-pipeline extract --skip-existing
-./dist/ft-pipeline extract --dry-run --limit 10
-./dist/ft-pipeline classify --dry-run --limit 10
-./dist/ft-pipeline sync --password "$FT_PIPELINE_PASSWORD"
-./dist/ft-pipeline -v full --password "$FT_PIPELINE_PASSWORD"
+ft-pipeline extract --skip-existing
+ft-pipeline extract --dry-run --limit 10
+ft-pipeline classify --dry-run --limit 10
+ft-pipeline sync --password "$FT_PIPELINE_PASSWORD"
+ft-pipeline -v full --password "$FT_PIPELINE_PASSWORD"
 ```
 
 Global options (from root help) include `--cookies`, `--force`, `--config`, `--verbose` / `--quiet`,
@@ -232,12 +246,12 @@ Global options (from root help) include `--cookies`, `--force`, `--config`, `--v
 File: `~/.config/ft-pipeline/config.jsonc`
 
 ```bash
-./dist/ft-pipeline config init
-./dist/ft-pipeline config show
-./dist/ft-pipeline config file
-./dist/ft-pipeline config set maxExternalCallAttempts 4
-./dist/ft-pipeline config migrate      # rewrite old key names on disk
-./dist/ft-pipeline config --migrate    # same
+ft-pipeline config init
+ft-pipeline config show
+ft-pipeline config file
+ft-pipeline config set maxExternalCallAttempts 4
+ft-pipeline config migrate      # rewrite old key names on disk
+ft-pipeline config --migrate    # same
 ```
 
 Resolution order (highest wins):
@@ -273,7 +287,7 @@ A `.env` under the config directory is loaded when present.
 0 10,16,2 * * * \
   FT_COOKIES_PATH="$HOME/.config/ft-pipeline/.sync-cookies.enc" \
   FT_PIPELINE_PASSWORD="$(cat "$HOME/.config/ft-pipeline/.pw")" \
-  /path/to/ft-pipeline/dist/ft-pipeline full
+  "$HOME/.local/bin/ft-pipeline" full
 ```
 
 #### `scripts/run-with-llm.sh`
@@ -292,7 +306,7 @@ chmod +x scripts/run-with-llm.sh
 # Defaults: PIPELINE=ft-pipeline, PIPELINE_CMD=full, LLM via llama-me -r on :1234
 ./scripts/run-with-llm.sh
 
-PIPELINE="/path/to/dist/ft-pipeline" \
+PIPELINE="$HOME/.local/bin/ft-pipeline" \
 PIPELINE_CMD="full" \
 LLM_START_CMD="llama-me -r" \
 LLM_PROCESS="llama-server" \
@@ -314,14 +328,15 @@ LLM_PORT=1234 \
 ```bash
 deno task start          # CLI entry (least-privilege)
 deno task build          # compile host binary -> dist/ft-pipeline
+deno task install        # build + install to XDG_BIN / XDG_BIN_HOME / ~/.local/bin
 deno task build:linux    # also: build:windows, build:macos-arm, build:macos-x64
 deno task test:unit
 deno task test:e2e
 deno task ch:all         # fmt + check + lint (required after code changes)
 ```
 
-There is no `deno task migrate` / `deno task sync` shortcut for production commands. Use the binary
-or `deno task start <command>`.
+There is no `deno task migrate` / `deno task sync` shortcut for production commands. Use
+`ft-pipeline` after `deno task install`, or `deno task start <command>`.
 
 ### Layout
 

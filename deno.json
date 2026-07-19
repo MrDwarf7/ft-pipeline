@@ -17,6 +17,7 @@
     "test:integration": "deno test --allow-all tests/integration/",
     "test:e2e": "deno test --allow-all tests/e2e/",
     "build": "deno compile --allow-read --allow-write --allow-env --allow-sys=homedir --allow-net --exclude-unused-npm -o dist/ft-pipeline src/main.ts",
+    "install": "bash scripts/install.sh",
     "uat:build": "FT_PIPELINE_ENV=development deno task build",
     "uat": "FT_PIPELINE_ENV=development deno task uat:build && FT_PIPELINE_ENV=development ./dist/ft-pipeline",
     "release:build": "FT_PIPELINE_ENV=production deno task build",

@@ -14,34 +14,43 @@ Local Deno CLI: X bookmarks -> SQLite + Clippings + Obsidian wiki pages.
 **Repo (this machine):** absolute path of the clone you are in. Prefer `pwd` / project root. Do not
 invent `~/...` paths that resolve into a sandbox home unless the user said so.
 
-## Prefer the compiled binary when present
+## Prefer an installed binary
 
 ```bash
-# From repo root (DB is node:sqlite -- no host sqlite3 CLI)
-test -x ./dist/ft-pipeline && BIN=./dist/ft-pipeline || BIN="deno task start"
+# From repo root -- install once (build + copy onto a user bin dir)
+deno task install
+# Prefer order: INSTALL_DIR override, $XDG_BIN, $XDG_BIN_HOME, $HOME/.local/bin
+# Last resort: leaves dist/ft-pipeline and prints how to run it
+
+# Then run by name (or absolute path if not on PATH yet)
+command -v ft-pipeline >/dev/null && BIN=ft-pipeline \
+  || { test -x ./dist/ft-pipeline && BIN=./dist/ft-pipeline; } \
+  || BIN="deno task start"
+
 $BIN --help
 $BIN migrate
 $BIN config show
 ```
 
-Build if missing: `deno task build` -> `./dist/ft-pipeline`.
+Rebuild only (no install): `deno task build` -> `./dist/ft-pipeline`.
 
 There is **no** `deno task full` / `deno task sync`. Use `$BIN <command>` or
 `deno task start <command>`.
 
 ## Safe first-time path (humans / agents)
 
-1. `migrate` -- create/update DB (always safe to re-run)
-2. `cookies extract` -- interactive once; needs a browser session with X logged in
-3. Set env (or project/config `.env` under XDG config):
+1. `deno task install` (optional but preferred) or use `deno task start`
+2. `migrate` -- create/update DB (always safe to re-run)
+3. `cookies extract` -- interactive once; needs a browser session with X logged in
+4. Set env (or project/config `.env` under XDG config):
 
 ```bash
 export FT_COOKIES_PATH="$HOME/.config/ft-pipeline/.sync-cookies.enc"
 export FT_PIPELINE_PASSWORD="..."   # or --password on sync/full
 ```
 
-4. Optional: `config init` then `config show`
-5. `full --password "$FT_PIPELINE_PASSWORD"` or step-by-step
+5. Optional: `config init` then `config show`
+6. `full --password "$FT_PIPELINE_PASSWORD"` or step-by-step
 
 ## Commands (what each one is for)
 
@@ -56,6 +65,7 @@ export FT_PIPELINE_PASSWORD="..."   # or --password on sync/full
 | `generate`                          | DB                                 | Bookmark markdown under wiki                       |
 | `indexes`                           | DB                                 | Category/domain/entity pages (hash-skip unchanged) |
 | `config show/file/init/set/migrate` | --                                 | Inspect / edit / rewrite legacy keys               |
+| `completion`                        | shell name                         | Print bash/zsh/fish/pwsh completions               |
 | `full`                              | cookies for sync; LLM for classify | Entire sequence                                    |
 
 Soft step failures inside `full` are logged; remaining steps still run. Hard errors (bad password,
@@ -69,8 +79,9 @@ Use repo script `scripts/run-with-llm.sh`:
 # Defaults: runs `ft-pipeline full`, starts `llama-me -r` if needed, port 1234
 ./scripts/run-with-llm.sh
 
-# Or point at the compiled binary on PATH / absolute path
-PIPELINE="/abs/path/to/dist/ft-pipeline" PIPELINE_CMD="full" ./scripts/run-with-llm.sh
+# After deno task install (PATH or absolute)
+PIPELINE="ft-pipeline" PIPELINE_CMD="full" ./scripts/run-with-llm.sh
+PIPELINE="$HOME/.local/bin/ft-pipeline" PIPELINE_CMD="full" ./scripts/run-with-llm.sh
 ```
 
 | Env             | Default        | Meaning                       |
@@ -88,7 +99,7 @@ Bare cron without the wrapper (password from a root-only file):
 
 ```bash
 0 10,16,2 * * * FT_COOKIES_PATH=... FT_PIPELINE_PASSWORD="$(cat .../.pw)" \
-  /abs/path/dist/ft-pipeline full
+  "$HOME/.local/bin/ft-pipeline" full
 ```
 
 ## Config notes agents forget

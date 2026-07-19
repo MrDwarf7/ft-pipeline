@@ -183,16 +183,15 @@ Removed dead modules: old option tombstones and legacy shell helpers (do not rei
 ## Commands
 
 ```bash
-deno task start          # Run pipeline with default command
-deno task migrate        # Create/migrate pipeline DB schema (run first)
-deno task sync           # Sync bookmarks from X via native GraphQL client
-deno task extract        # Pull content from xtracticle.com API -> Clippings/
-deno task merge          # Merge Clippings enriched text back into DB
-deno task classify       # LLM classification (type + domain) -> DB
-deno task generate       # Template-based .md generation from pipeline.db
-deno task indexes        # Generate category/domain index pages
-deno task full           # Run entire pipeline end-to-end
+deno task start <cmd>    # Least-privilege deno run of the CLI
+deno task build          # Compile host binary -> dist/ft-pipeline
+deno task install        # Build + install to XDG_BIN / XDG_BIN_HOME / ~/.local/bin
+deno task ch:all         # fmt + check + lint (required after code changes)
+deno task test:unit      # unit + integration tests
 ```
+
+There is **no** `deno task migrate` / `sync` / `full`. After install, run `ft-pipeline <cmd>` (or
+`deno task start <cmd>` / `./dist/ft-pipeline <cmd>`).
 
 ## Pipeline Status
 
