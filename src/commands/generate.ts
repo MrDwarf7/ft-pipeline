@@ -99,11 +99,18 @@ const bookmarkTemplate: BookmarkTemplate = (b) => {
     .join("\n");
 };
 
-const buildFilename = (b: BookmarkData): string => {
+/** Minimal shape `buildFilename` needs — lets tests pass a subset of BookmarkData. */
+export interface FilenameInput {
+  posted_at: string;
+  author_handle: string;
+  display_text: string;
+}
+
+export const buildFilename = (b: FilenameInput): string => {
   const { parts } = parseDate(b.posted_at);
-  const { year, month, day } = parts;
+  const { year, month, day, dow } = parts;
   const slug = slugify(b.display_text.slice(0, 80));
-  return `${year}_${month}_${day}-${day}-${b.author_handle}-${slug}.md`;
+  return `${year}_${month}_${day}-${dow}-${b.author_handle}-${slug}.md`;
 };
 
 const fetchAllBookmarks = (): BookmarkData[] => {

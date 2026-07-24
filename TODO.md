@@ -47,6 +47,23 @@ Details (historical briefs): [`docs/worktrees-immediate.md`](docs/worktrees-imme
 
 **Still open (feature / optional):**
 
+- **`renormalize` command (HIGH priority -- maintenance tool):** re-derive every bookmark's on-disk
+  filename from `pipeline.db` using the current `buildFilename` convention and rename the file if it
+  drifted. Needed whenever the naming format changes (e.g. the `YYYY_MM_DD-DD-` double-day
+  regression from the datetime refactor left ~3.1k files with a duplicated numeric day instead of
+  the DOW segment). Should be idempotent (no-op when filename already matches), dry-run flag, and
+  skip files whose DB row is missing. Lets us change the convention and iterate without
+  hand-fiddling renames. See `src/commands/generate.ts::buildFilename` for the canonical format.
+  - **Sub-feature: config-driven `dateFormatter` (string template).** Add a `dateFormatter` config
+    key holding the filename prefix template (e.g. `{year}_{month}_{day}-{dow}`) so users can
+    redefine how the prefix is written without touching code. Current hardcoded format is the
+    DEFAULT and the FALLBACK when the key is missing/empty/invalid. `buildFilename` reads the
+    template from `CONFIG` and interpolates the `DateParts` fields (`year/month/day/dow/hh/mm/iso`).
+    **Migration requirement:** adding this key means a config migration entry — extend
+    `CONFIG_KEY_RENAMES` / `applyConfigKeyRenames` (`src/config.ts`) so existing `config.jsonc`
+    files that lack `dateFormatter` get it seeded with the default on next `migrateConfigFile` run
+    (and `configSchema` gains the optional key with the default applied at load). Must be
+    backward-compatible: old configs keep working, new key is additive, never a breaking rename.
 - Config resolution unit test (needs injectable load)
 - Feature parity: media download, folders, LLM fallback chain
 - Index multi-type/domain display
